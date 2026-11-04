@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wr-pipeline"
+version = "0.1.0"
+description = "Weather Report - pipeline di generazione mappe dai modelli numerici"
+requires-python = ">=3.11"
+dependencies = [
+  "ecmwf-opendata",
+  "xarray",
+  "cfgrib",
+  "eccodes",
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "cartopy",
+  "pillow",
+  "boto3",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+wr = "wr_pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

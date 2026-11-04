@@ -1,0 +1,28 @@
+# scale/offset: valore_finale = valore_grib * scale + offset
+t2m:
+  label: "Temperatura a 2 m"
+  unit: "°C"
+  scale: 1
+  offset: -273.15
+  kind: fill
+  cmap: Spectral_r
+  levels: [-30, 45, 3]               # min, max, passo
+  extend: both
+mslp:
+  label: "Pressione al livello del mare"
+  unit: "hPa"
+  scale: 0.01
+  offset: 0
+  kind: contour
+  levels: [940, 1060, 4]
+tp-acc:
+  label: "Precipitazione cumulata dal run"
+  unit: "mm"
+  scale: 1000
+  offset: 0
+  kind: fill
+  cmap: YlGnBu
+  levels_list: [0.1, 1, 2, 5, 10, 20, 30, 50, 75, 100, 150, 200]
+  extend: max
+  mask_below: 0.1
+  skip_step0: true

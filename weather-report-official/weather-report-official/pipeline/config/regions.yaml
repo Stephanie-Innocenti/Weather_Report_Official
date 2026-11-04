@@ -1,0 +1,7 @@
+# bbox: [ovest, sud, est, nord] in gradi
+eu:
+  label: "Europa"
+  bbox: [-25, 30, 45, 72]
+it:
+  label: "Italia"
+  bbox: [6, 35.5, 19, 47.5]

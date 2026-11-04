@@ -1,0 +1,12 @@
+# Un modello = una voce. Nuovo modello: nuova voce + nuovo file in src/wr_pipeline/sources/
+ecmwf-ifs:
+  label: "ECMWF IFS"
+  enabled: true
+  source: ecmwf_opendata
+  client: { source: aws, model: ifs, resol: 0p25 }
+  stream: oper
+  runs: [0, 12]                      # 06/18 UTC hanno meno step: rimandati
+  steps: { start: 0, stop: 144, every: 3 }
+  params: { t2m: "2t", mslp: "msl", tp-acc: "tp" }   # variabile nostra -> parametro GRIB
+  regions: [eu, it]
+  attribution: "Adapted from ECMWF IFS Open Data, CC BY 4.0 - Weather Report"
