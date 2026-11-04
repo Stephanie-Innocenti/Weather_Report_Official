@@ -3,7 +3,10 @@ ecmwf-ifs:
   label: "ECMWF IFS"
   enabled: true
   source: ecmwf_opendata
-  client: { source: aws, model: ifs, resol: 0p25 }
+  client: { model: ifs, resol: 0p25 }
+  sources: [google, azure, ecmwf, aws]   # provate in ordine
+  retries: 3
+  retry_after: 20
   stream: oper
   runs: [0, 12]                      # 06/18 UTC hanno meno step: rimandati
   steps: { start: 0, stop: 144, every: 3 }
