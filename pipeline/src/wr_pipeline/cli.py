@@ -1,6 +1,7 @@
 """CLI: wr ingest --model ecmwf-ifs [--run latest|YYYYMMDDHH] [--local DIR]"""
 import argparse
 import importlib
+import json
 import logging
 import tempfile
 from pathlib import Path
@@ -15,11 +16,17 @@ IMG_CACHE = "public, max-age=31536000, immutable"  # il run e' nel path: non cam
 SOURCES = {
     "ecmwf_opendata": "wr_pipeline.sources.ecmwf",
     "noaa_gfs": "wr_pipeline.sources.noaa_gfs",
+    "dwd_icon": "wr_pipeline.sources.dwd_icon",
 }
 
 
 def _source(name: str):
     return importlib.import_module(SOURCES[name])
+
+
+def _effective_var(var: dict, spec: dict) -> dict:
+    """Variabile con eventuale override di scale/offset specifico del modello (es. FI -> dam)."""
+    return {**var, **{k: spec[k] for k in ("scale", "offset") if k in spec}}
 
 
 def ingest(args) -> int:
@@ -53,14 +60,26 @@ def ingest(args) -> int:
     log.info("Modello %s, run %s, step %s..%s", args.model, rid, steps[0], steps[-1])
 
     store = get_store(args.local)
-    if not args.force and store.exists(naming.run_manifest_key(args.model, rid)):
-        log.info("Run gia' pubblicato, niente da fare (usa --force per rigenerare)")
-        return 0
+    raw = store.get(naming.run_manifest_key(args.model, rid))
+    old = json.loads(raw) if raw else {"vars": {}, "regions": {}}
+
+    def complete(v: str) -> bool:
+        info = old["vars"].get(v)
+        return bool(info and info["steps"] and max(info["steps"]) >= steps[-1] and set(regions) <= set(old["regions"]))
+
+    if not args.force:
+        todo = [v for v in var_ids if not complete(v)]
+        if not todo:
+            log.info("Run gia' completo, niente da fare (usa --force per rigenerare)")
+            return 0
+        if len(todo) < len(var_ids):
+            log.info("Run gia' parziale: completo solo %s", todo)
+        var_ids = todo
 
     produced: dict[str, list[int]] = {}
     with tempfile.TemporaryDirectory() as tmp:
         for var_id in var_ids:
-            spec, var = specs[var_id], vars_cfg[var_id]
+            spec, var = specs[var_id], _effective_var(vars_cfg[var_id], specs[var_id])
             log.info("Scarico %s (%s)", var_id, spec["param"])
             grib = src.download(m, run, spec, steps, Path(tmp) / f"{var_id}.grib2")
             da = open_param(grib, spec.get("short", spec["param"]))
@@ -76,7 +95,12 @@ def ingest(args) -> int:
                 produced[var_id].append(hours)
             log.info("%s: %d step pubblicati", var_id, len(produced[var_id]))
 
-    mf.write_run_manifest(store, args.model, m, rid, regions_cfg, vars_cfg, produced, regions)
+    # il manifest e' ADDITIVO: le variabili gia' presenti restano, quelle rigenerate vengono aggiornate
+    merged = {v: x["steps"] for v, x in old["vars"].items()}
+    merged.update(produced)
+    merged = {v: merged[v] for v in m["params"] if v in merged}  # ordine come in models.yaml
+    regions_all = [r for r in regions_cfg if r in set(old["regions"]) | set(regions)]
+    mf.write_run_manifest(store, args.model, m, rid, regions_cfg, vars_cfg, merged, regions_all)
     mf.update_latest(store, args.model, m["label"], rid)
     removed = mf.cleanup(store, args.model, keep=2)
     log.info("Fatto. Run rimossi: %s", removed or "nessuno")

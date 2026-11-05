@@ -5,7 +5,7 @@ t2m:
   scale: 1
   offset: -273.15
   kind: fill
-  cmap: Spectral_r
+  stops: [[-30,"#3a0a5c"],[-20,"#5a2ca0"],[-12,"#2f55d4"],[-6,"#3f93f0"],[-0.1,"#a9ddf5"],[0.1,"#b8e8a6"],[6,"#79cf6c"],[12,"#f4e65a"],[20,"#f7a53b"],[28,"#e2432b"],[36,"#a1122a"],[45,"#5a0a2c"]]
   levels: [-30, 45, 3]               # min, max, passo
   extend: both
 mslp:
@@ -32,7 +32,7 @@ z500:
   scale: 0.1                         # gpm -> dam
   offset: 0
   kind: fill
-  cmap: Spectral_r
+  stops: [[480,"#2a0b5e"],[504,"#3b3fc4"],[516,"#3d8be8"],[528,"#4fc3e8"],[540,"#66d1a4"],[552,"#a6dd6a"],[558,"#e9e25b"],[570,"#f6b23c"],[582,"#ee6a2e"],[592,"#c8262f"],[600,"#7a0f3b"]]
   levels: [480, 600, 6]
   lines: [480, 600, 6]               # isoipse ogni 6 dam
   extend: both
@@ -42,7 +42,7 @@ z850:
   scale: 0.1
   offset: 0
   kind: fill
-  cmap: Spectral_r
+  stops: [[90,"#2a0b5e"],[110,"#3b3fc4"],[120,"#3d8be8"],[130,"#4fc3e8"],[138,"#66d1a4"],[146,"#a6dd6a"],[152,"#e9e25b"],[160,"#f6b23c"],[168,"#ee6a2e"],[174,"#c8262f"],[178,"#7a0f3b"]]
   levels: [90, 178, 4]
   lines: [90, 178, 4]
   extend: both
@@ -52,6 +52,6 @@ t850:
   scale: 1
   offset: -273.15
   kind: fill
-  cmap: Spectral_r
+  stops: [[-30,"#3a0a5c"],[-22,"#5a2ca0"],[-14,"#2f55d4"],[-7,"#3f93f0"],[-0.1,"#a9ddf5"],[0.1,"#b8e8a6"],[6,"#79cf6c"],[12,"#f4e65a"],[18,"#f7a53b"],[24,"#e2432b"],[30,"#a1122a"]]
   levels: [-30, 30, 3]
   extend: both

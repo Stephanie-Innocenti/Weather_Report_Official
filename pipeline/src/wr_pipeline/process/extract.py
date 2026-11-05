@@ -7,11 +7,10 @@ import xarray as xr
 
 
 def open_param(grib_path, short_name: str) -> xr.DataArray:
-    ds = xr.open_dataset(
-        grib_path,
-        engine="cfgrib",
-        backend_kwargs={"filter_by_keys": {"shortName": short_name}, "indexpath": ""},
-    )
+    kwargs = {"indexpath": ""}
+    if short_name:  # senza short_name si apre il file cosi' com'e' (file con un solo parametro)
+        kwargs["filter_by_keys"] = {"shortName": short_name}
+    ds = xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs=kwargs)
     da = ds[list(ds.data_vars)[0]]
     # longitudine 0..360 -> -180..180, assi crescenti
     da = da.assign_coords(longitude=((da.longitude + 180) % 360) - 180)

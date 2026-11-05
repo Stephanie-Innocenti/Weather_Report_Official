@@ -35,3 +35,19 @@ gfs:
     t850: { param: "TMP", level: "850 mb", short: "t" }
   regions: [eu, it]
   attribution: "Adapted from NOAA GFS (public domain) - Weather Report"
+
+icon-eu:
+  label: "ICON-EU (DWD)"
+  enabled: true
+  source: dwd_icon
+  runs: [0, 6, 12, 18]
+  steps: { start: 0, stop: 120, every: 3 }
+  params:                            # short: ~ = nessun filtro (un solo parametro per file)
+    t2m: { param: "T_2M", short: ~ }
+    mslp: { param: "PMSL", short: ~ }
+    tp-acc: { param: "TOT_PREC", scale: 1, short: ~ }                      # gia' in mm dall'inizio del run
+    z500: { param: "FI", level: 500, scale: 0.0101972, short: ~ }          # m2/s2 -> dam: 1/(9.80665*10)
+    z850: { param: "FI", level: 850, scale: 0.0101972, short: ~ }
+    t850: { param: "T", level: 850, short: ~ }
+  regions: [eu, it]                  # il dominio ICON-EU copre circa 29.5-70.5 N, 23.5 W-62.5 E
+  attribution: "Datenbasis: Deutscher Wetterdienst (DWD), ICON-EU - adapted by Weather Report"

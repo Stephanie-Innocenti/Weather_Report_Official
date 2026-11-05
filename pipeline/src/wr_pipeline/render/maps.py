@@ -7,6 +7,7 @@ matplotlib.use("Agg")
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 from PIL import Image
 
@@ -18,6 +19,16 @@ def _levels(var: dict) -> np.ndarray:
         return np.array(var["levels_list"], dtype=float)
     lo, hi, step = var["levels"]
     return np.arange(lo, hi + step / 2, step)
+
+
+def _cmap(var: dict, levels: np.ndarray):
+    """Palette: 'stops' = [[valore, colore], ...] ancorati ai valori fisici, altrimenti 'cmap' di matplotlib."""
+    if "stops" not in var:
+        return plt.get_cmap(var["cmap"])
+    lo, hi = float(levels[0]), float(levels[-1])
+    pts = [(min(max((float(v) - lo) / (hi - lo), 0.0), 1.0), c) for v, c in var["stops"]]
+    pts[0], pts[-1] = (0.0, pts[0][1]), (1.0, pts[-1][1])
+    return LinearSegmentedColormap.from_list("wr", pts, N=512)
 
 
 def render_map(field, var: dict, region: dict, meta: dict) -> bytes:
@@ -44,7 +55,7 @@ def render_map(field, var: dict, region: dict, meta: dict) -> bytes:
         if "mask_below" in var:
             vals = np.ma.masked_less(vals, var["mask_below"])
         mappable = ax.contourf(
-            lon, lat, vals, levels=levels, cmap=var["cmap"],
+            lon, lat, vals, levels=levels, cmap=_cmap(var, levels),
             extend=var.get("extend", "neither"), transform=PC, zorder=1,
         )
 
