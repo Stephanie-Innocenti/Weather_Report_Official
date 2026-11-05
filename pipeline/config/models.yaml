@@ -1,4 +1,5 @@
 # Un modello = una voce. Nuovo modello: nuova voce + nuovo file in src/wr_pipeline/sources/
+# params: variabile nostra -> parametro del modello. Stringa oppure dict (levtype, levelist, level, short).
 ecmwf-ifs:
   label: "ECMWF IFS"
   enabled: true
@@ -10,6 +11,27 @@ ecmwf-ifs:
   stream: oper
   runs: [0, 12]                      # 06/18 UTC hanno meno step: rimandati
   steps: { start: 0, stop: 144, every: 3 }
-  params: { t2m: "2t", mslp: "msl", tp-acc: "tp" }   # variabile nostra -> parametro GRIB
+  params:
+    t2m: { param: "2t" }
+    mslp: { param: "msl" }
+    tp-acc: { param: "tp" }
+    z500: { param: "gh", levtype: pl, levelist: 500 }
+    z850: { param: "gh", levtype: pl, levelist: 850 }
+    t850: { param: "t", levtype: pl, levelist: 850 }
   regions: [eu, it]
   attribution: "Adapted from ECMWF IFS Open Data, CC BY 4.0 - Weather Report"
+
+gfs:
+  label: "GFS"
+  enabled: true
+  source: noaa_gfs
+  runs: [0, 6, 12, 18]
+  steps: { start: 0, stop: 144, every: 3 }
+  params:                            # short = nome cfgrib per leggere il GRIB
+    t2m: { param: "TMP", level: "2 m above ground", short: "2t" }
+    mslp: { param: "PRMSL", level: "mean sea level", short: "prmsl" }
+    z500: { param: "HGT", level: "500 mb", short: "gh" }
+    z850: { param: "HGT", level: "850 mb", short: "gh" }
+    t850: { param: "TMP", level: "850 mb", short: "t" }
+  regions: [eu, it]
+  attribution: "Adapted from NOAA GFS (public domain) - Weather Report"

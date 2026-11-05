@@ -13,6 +13,12 @@ on:
         description: "Rigenera anche se esiste"
         type: boolean
         default: false
+      vars:
+        description: "Solo alcune variabili, es. z500,t850 (vuoto = tutte)"
+        default: ""
+      steps_max:
+        description: "Limita gli step per un test veloce, es. 12 (vuoto = tutti)"
+        default: ""
 
 concurrency:
   group: ingest-ecmwf-ifs
@@ -21,7 +27,7 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -51,4 +57,6 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           RUN: ${{ inputs.run || 'latest' }}
           FORCE: ${{ inputs.force && '--force' || '' }}
-        run: wr ingest --model ecmwf-ifs --run "$RUN" $FORCE
+          VARS: ${{ inputs.vars && format('--vars {0}', inputs.vars) || '' }}
+          STEPS: ${{ inputs.steps_max && format('--steps-max {0}', inputs.steps_max) || '' }}
+        run: wr ingest --model ecmwf-ifs --run "$RUN" $FORCE $VARS $STEPS

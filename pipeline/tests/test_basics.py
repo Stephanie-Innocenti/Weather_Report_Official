@@ -22,3 +22,18 @@ def test_configs_consistent():
     for m in models.values():
         assert set(m["params"]) <= set(variables)
         assert set(m["regions"]) <= set(regions)
+
+
+def test_param_spec():
+    assert config.param_spec("2t") == {"param": "2t"}
+    assert config.param_spec({"param": "gh", "levelist": 500})["levelist"] == 500
+
+
+def test_gfs_ranges(monkeypatch):
+    from wr_pipeline.sources import noaa_gfs as g
+
+    rows = [(0, "PRMSL", "mean sea level"), (100, "HGT", "500 mb"), (250, "TMP", "850 mb")]
+    monkeypatch.setattr(g, "_idx", lambda url: rows)
+    assert g._ranges("u", {"param": "HGT", "level": "500 mb"}) == [(100, 249)]
+    assert g._ranges("u", {"param": "TMP", "level": "850 mb"}) == [(250, None)]
+    assert g._ranges("u", {"param": "TMP", "level": "2 m above ground"}) == []

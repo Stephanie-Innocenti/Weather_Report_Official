@@ -15,3 +15,8 @@ def expand_steps(spec: dict, steps_max: int | None = None) -> list[int]:
     if steps_max is not None:
         steps = [s for s in steps if s <= steps_max]
     return steps
+
+
+def param_spec(p) -> dict:
+    """Un parametro puo' essere una stringa ("2t") oppure un dict con levtype/levelist/level/short."""
+    return dict(p) if isinstance(p, dict) else {"param": p}

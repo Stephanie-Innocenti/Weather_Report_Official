@@ -48,6 +48,12 @@ def render_map(field, var: dict, region: dict, meta: dict) -> bytes:
             extend=var.get("extend", "neither"), transform=PC, zorder=1,
         )
 
+    if var["kind"] == "fill" and "lines" in var:
+        lo, hi, st = var["lines"]
+        cl = ax.contour(lon, lat, field.values, levels=np.arange(lo, hi + st / 2, st),
+                        colors="#1b1b1b", linewidths=0.6, transform=PC, zorder=2)
+        ax.clabel(cl, fmt="%d", fontsize=7)
+
     ax.add_feature(cfeature.COASTLINE.with_scale("50m"), linewidth=0.7, zorder=2)
     ax.add_feature(cfeature.BORDERS.with_scale("50m"), linewidth=0.5, linestyle=":", zorder=2)
 

@@ -19,6 +19,7 @@ dependencies = [
   "pillow",
   "boto3",
   "pyyaml",
+  "requests",
 ]
 
 [project.optional-dependencies]

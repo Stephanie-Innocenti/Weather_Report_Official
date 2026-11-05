@@ -12,7 +12,10 @@ from .publish.storage import get_store
 log = logging.getLogger("wr")
 IMG_CACHE = "public, max-age=31536000, immutable"  # il run e' nel path: non cambia mai
 
-SOURCES = {"ecmwf_opendata": "wr_pipeline.sources.ecmwf"}
+SOURCES = {
+    "ecmwf_opendata": "wr_pipeline.sources.ecmwf",
+    "noaa_gfs": "wr_pipeline.sources.noaa_gfs",
+}
 
 
 def _source(name: str):
@@ -33,9 +36,14 @@ def ingest(args) -> int:
     steps = config.expand_steps(m["steps"], args.steps_max)
     var_ids = args.vars.split(",") if args.vars else list(m["params"])
     regions = args.regions.split(",") if args.regions else m["regions"]
+    unknown = [v for v in var_ids if v not in m["params"]]
+    if unknown:
+        log.error("Variabili non previste per %s: %s", args.model, unknown)
+        return 2
+    specs = {v: config.param_spec(m["params"][v]) for v in var_ids}
 
     if args.run == "latest":
-        run = src.latest_run(m, max(all_steps), m["params"][var_ids[0]])
+        run = src.latest_run(m, max(all_steps), specs[var_ids[0]])
     else:
         run = naming.parse_run_id(args.run)
     if run.hour not in m["runs"]:
@@ -52,10 +60,10 @@ def ingest(args) -> int:
     produced: dict[str, list[int]] = {}
     with tempfile.TemporaryDirectory() as tmp:
         for var_id in var_ids:
-            param, var = m["params"][var_id], vars_cfg[var_id]
-            log.info("Scarico %s (%s)", var_id, param)
-            grib = src.download(m, run, param, steps, Path(tmp) / f"{var_id}.grib2")
-            da = open_param(grib, param)
+            spec, var = specs[var_id], vars_cfg[var_id]
+            log.info("Scarico %s (%s)", var_id, spec["param"])
+            grib = src.download(m, run, spec, steps, Path(tmp) / f"{var_id}.grib2")
+            da = open_param(grib, spec.get("short", spec["param"]))
             produced[var_id] = []
             for hours, valid, field in iter_fields(da, var):
                 for region_id in regions:
