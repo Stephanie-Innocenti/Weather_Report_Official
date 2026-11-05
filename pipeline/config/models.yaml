@@ -18,6 +18,7 @@ ecmwf-ifs:
     z500: { param: "gh", levtype: pl, levelist: 500 }
     z850: { param: "gh", levtype: pl, levelist: 850 }
     t850: { param: "t", levtype: pl, levelist: 850 }
+    wind10m: { u: { param: "10u" }, v: { param: "10v" } }
   regions: [eu, it]
   attribution: "Adapted from ECMWF IFS Open Data, CC BY 4.0 - Weather Report"
 
@@ -33,6 +34,9 @@ gfs:
     z500: { param: "HGT", level: "500 mb", short: "gh" }
     z850: { param: "HGT", level: "850 mb", short: "gh" }
     t850: { param: "TMP", level: "850 mb", short: "t" }
+    wind10m:
+      u: { param: "UGRD", level: "10 m above ground", short: "10u" }
+      v: { param: "VGRD", level: "10 m above ground", short: "10v" }
   regions: [eu, it]
   attribution: "Adapted from NOAA GFS (public domain) - Weather Report"
 
@@ -49,5 +53,6 @@ icon-eu:
     z500: { param: "FI", level: 500, scale: 0.0101972, short: ~ }          # m2/s2 -> dam: 1/(9.80665*10)
     z850: { param: "FI", level: 850, scale: 0.0101972, short: ~ }
     t850: { param: "T", level: 850, short: ~ }
+    wind10m: { u: { param: "U_10M", short: ~ }, v: { param: "V_10M", short: ~ } }
   regions: [eu, it]                  # il dominio ICON-EU copre circa 29.5-70.5 N, 23.5 W-62.5 E
   attribution: "Datenbasis: Deutscher Wetterdienst (DWD), ICON-EU - adapted by Weather Report"

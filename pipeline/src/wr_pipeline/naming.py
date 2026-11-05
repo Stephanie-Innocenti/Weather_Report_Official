@@ -21,3 +21,8 @@ def image_key(model: str, run: str, region: str, var: str, step: int) -> str:
 
 def run_manifest_key(model: str, run: str) -> str:
     return f"{model}/{run}/manifest.json"
+
+
+def data_key(model: str, run: str, region: str, var: str, step: int, ext: str = "json") -> str:
+    """Dati grezzi per la mappa live (es. vento): stessa cartella delle immagini, estensione diversa."""
+    return f"{model}/{run}/{region}/{var}/f{step:03d}.{ext}"

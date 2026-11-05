@@ -13,6 +13,14 @@ def _now() -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _var_info(var: dict, steps, regions) -> dict:
+    info = {"label": var["label"], "unit": var["unit"], "steps": sorted(steps)}
+    live = [r for r in var.get("json_regions", []) if r in regions]
+    if live:
+        info["json_regions"] = live  # regioni con dati JSON per la mappa live
+    return info
+
+
 def write_run_manifest(store, model_id, model_cfg, run, regions_cfg, vars_cfg, produced, regions):
     manifest = {
         "model": model_id,
@@ -22,10 +30,7 @@ def write_run_manifest(store, model_id, model_cfg, run, regions_cfg, vars_cfg, p
         "generated": _now(),
         "attribution": model_cfg["attribution"],
         "regions": {r: {"label": regions_cfg[r]["label"], "bbox": regions_cfg[r]["bbox"]} for r in regions},
-        "vars": {
-            v: {"label": vars_cfg[v]["label"], "unit": vars_cfg[v]["unit"], "steps": sorted(steps)}
-            for v, steps in produced.items()
-        },
+        "vars": {v: _var_info(vars_cfg[v], steps, regions) for v, steps in produced.items()},
     }
     store.put(run_manifest_key(model_id, run), json.dumps(manifest, ensure_ascii=False).encode(), JSON, RUN_CACHE)
 

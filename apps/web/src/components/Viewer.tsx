@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchLatest, fetchRun, imageUrl, runStart, type Latest, type RunManifest } from "@/src/lib/data";
+import { fetchLatest, fetchRun, imageUrl, runStart, type Latest, type RunManifest } from "@/lib/data";
 
 type Option = { id: string; text: string };
 
@@ -123,6 +124,7 @@ export default function Viewer() {
         <h1 className="brand">
           Weather Report <span>Official</span>
         </h1>
+        <Link className="navlink" href="/live">Mappa live del vento →</Link>
         <Choice
           label="Modello"
           value={model}

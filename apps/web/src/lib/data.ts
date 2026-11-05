@@ -7,6 +7,13 @@ export type Latest = {
   models: Record<string, { label: string; run: string }>;
 };
 
+export type VarInfo = {
+  label: string;
+  unit: string;
+  steps: number[];
+  json_regions?: string[]; // regioni con dati JSON per la mappa live (es. vento)
+};
+
 export type RunManifest = {
   model: string;
   label: string;
@@ -15,7 +22,7 @@ export type RunManifest = {
   generated: string;
   attribution: string;
   regions: Record<string, { label: string; bbox: number[] }>;
-  vars: Record<string, { label: string; unit: string; steps: number[] }>;
+  vars: Record<string, VarInfo>;
 };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -29,8 +36,17 @@ export const fetchLatest = () => getJson<Latest>("manifest/latest.json");
 export const fetchRun = (model: string, run: string) =>
   getJson<RunManifest>(`${model}/${run}/manifest.json`);
 
-export function imageUrl(m: RunManifest, region: string, variable: string, step: number): string {
-  return `${DATA_URL}/${m.model}/${m.run}/${region}/${variable}/f${String(step).padStart(3, "0")}.${m.ext}`;
+export function dataUrl(m: RunManifest, region: string, variable: string, step: number, ext: string): string {
+  return `${DATA_URL}/${m.model}/${m.run}/${region}/${variable}/f${String(step).padStart(3, "0")}.${ext}`;
+}
+
+export const imageUrl = (m: RunManifest, region: string, variable: string, step: number) =>
+  dataUrl(m, region, variable, step, m.ext);
+
+export async function fetchStepJson(m: RunManifest, region: string, variable: string, step: number): Promise<unknown> {
+  const res = await fetch(dataUrl(m, region, variable, step, "json"));
+  if (!res.ok) throw new Error(`Dati non disponibili per +${step} ore (HTTP ${res.status})`);
+  return res.json();
 }
 
 export function runStart(run: string): Date {

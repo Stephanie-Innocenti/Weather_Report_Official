@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap
 import numpy as np
 from PIL import Image
 
@@ -21,17 +21,24 @@ def _levels(var: dict) -> np.ndarray:
     return np.arange(lo, hi + step / 2, step)
 
 
-def _cmap(var: dict, levels: np.ndarray):
-    """Palette: 'stops' = [[valore, colore], ...] ancorati ai valori fisici, altrimenti 'cmap' di matplotlib."""
-    if "stops" not in var:
-        return plt.get_cmap(var["cmap"])
-    lo, hi = float(levels[0]), float(levels[-1])
-    pts = [(min(max((float(v) - lo) / (hi - lo), 0.0), 1.0), c) for v, c in var["stops"]]
-    pts[0], pts[-1] = (0.0, pts[0][1]), (1.0, pts[-1][1])
-    return LinearSegmentedColormap.from_list("wr", pts, N=512)
+def _style(var: dict, levels: np.ndarray) -> dict:
+    """Argomenti di colore per contourf. Tre modi, in ordine:
+    colors = un colore per fascia (+1 per ogni estremo aperto), stops = gradiente ancorato ai valori, cmap = nome matplotlib."""
+    if "colors" in var:
+        ext = var.get("extend", "neither")
+        n = len(levels) - 1 + {"neither": 0, "min": 1, "max": 1, "both": 2}[ext]
+        if len(var["colors"]) != n:
+            raise ValueError(f"{var['label']}: servono {n} colori, ce ne sono {len(var['colors'])}")
+        return {"cmap": ListedColormap(var["colors"]), "norm": BoundaryNorm(levels, ncolors=n, extend=ext)}
+    if "stops" in var:
+        lo, hi = float(levels[0]), float(levels[-1])
+        pts = [(min(max((float(v) - lo) / (hi - lo), 0.0), 1.0), c) for v, c in var["stops"]]
+        pts[0], pts[-1] = (0.0, pts[0][1]), (1.0, pts[-1][1])
+        return {"cmap": LinearSegmentedColormap.from_list("wr", pts, N=512)}
+    return {"cmap": plt.get_cmap(var["cmap"])}
 
 
-def render_map(field, var: dict, region: dict, meta: dict) -> bytes:
+def render_map(field, var: dict, region: dict, meta: dict, vectors=None) -> bytes:
     """field: DataArray 2D (latitude, longitude) gia' ritagliato e convertito.
     meta: model_label, run (datetime), step (int), valid (datetime), attribution."""
     west, south, east, north = region["bbox"]
@@ -55,9 +62,15 @@ def render_map(field, var: dict, region: dict, meta: dict) -> bytes:
         if "mask_below" in var:
             vals = np.ma.masked_less(vals, var["mask_below"])
         mappable = ax.contourf(
-            lon, lat, vals, levels=levels, cmap=_cmap(var, levels),
+            lon, lat, vals, levels=levels, **_style(var, levels),
             extend=var.get("extend", "neither"), transform=PC, zorder=1,
         )
+
+    if vectors is not None:  # frecce sottocampionate (vento)
+        u, v = vectors
+        sy, sx = max(1, u.shape[0] // 18), max(1, u.shape[1] // 26)
+        ax.quiver(lon[::sx], lat[::sy], u.values[::sy, ::sx], v.values[::sy, ::sx],
+                  transform=PC, color="#1b1b1b", width=0.0022, zorder=3)
 
     if var["kind"] == "fill" and "lines" in var:
         lo, hi, st = var["lines"]

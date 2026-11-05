@@ -29,6 +29,46 @@ def _effective_var(var: dict, spec: dict) -> dict:
     return {**var, **{k: spec[k] for k in ("scale", "offset") if k in spec}}
 
 
+def _scalar(spec: dict) -> dict:
+    """Per le variabili vettoriali (u/v) si usa la componente u per le operazioni comuni."""
+    return spec["u"] if "u" in spec else spec
+
+
+def _meta(m: dict, run, hours: int, valid) -> dict:
+    return {"model_label": m["label"], "run": run, "step": hours, "valid": valid, "attribution": m["attribution"]}
+
+
+def _ingest_vector(src, m, model, run, rid, var_id, spec, var, steps, regions, regions_cfg, store, tmp) -> list[int]:
+    """Vento: scarica u e v, produce l'immagine (velocita' + frecce) e, per le regioni indicate, il JSON per la mappa live."""
+    from .process.extract import crop, iter_fields, open_param
+    from .process.wind import wind_json
+    from .render.maps import render_map
+
+    log.info("Scarico %s (u, v)", var_id)
+    das = {}
+    for comp in ("u", "v"):
+        s = spec[comp]
+        grib = src.download(m, run, s, steps, Path(tmp) / f"{var_id}_{comp}.grib2")
+        das[comp] = open_param(grib, s.get("short", s["param"]))
+    done: list[int] = []
+    for (h, valid, fu), (h2, _, fv) in zip(iter_fields(das["u"], var), iter_fields(das["v"], var)):
+        if h != h2:
+            raise RuntimeError(f"Step di u e v non allineati: {h} / {h2}")
+        for region_id in regions:
+            reg = regions_cfg[region_id]
+            cu, cv = crop(fu, reg["bbox"]), crop(fv, reg["bbox"])
+            speed = (cu**2 + cv**2) ** 0.5 * 3.6  # m/s -> km/h
+            img = render_map(speed, var, reg, _meta(m, run, h, valid), vectors=(cu, cv))
+            store.put(naming.image_key(model, rid, region_id, var_id, h), img, "image/webp", IMG_CACHE)
+            if region_id in var.get("json_regions", []):
+                data = wind_json(cu["latitude"].values, cu["longitude"].values, cu.values, cv.values, valid,
+                                 var.get("json_step_deg", 0.5))
+                store.put(naming.data_key(model, rid, region_id, var_id, h), data, "application/json", IMG_CACHE)
+        done.append(h)
+    log.info("%s: %d step pubblicati", var_id, len(done))
+    return done
+
+
 def ingest(args) -> int:
     from .process.extract import crop, iter_fields, open_param
     from .render.maps import render_map
@@ -50,7 +90,7 @@ def ingest(args) -> int:
     specs = {v: config.param_spec(m["params"][v]) for v in var_ids}
 
     if args.run == "latest":
-        run = src.latest_run(m, max(all_steps), specs[var_ids[0]])
+        run = src.latest_run(m, max(all_steps), _scalar(specs[var_ids[0]]))
     else:
         run = naming.parse_run_id(args.run)
     if run.hour not in m["runs"]:
@@ -80,6 +120,10 @@ def ingest(args) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         for var_id in var_ids:
             spec, var = specs[var_id], _effective_var(vars_cfg[var_id], specs[var_id])
+            if var["kind"] == "vector":
+                produced[var_id] = _ingest_vector(src, m, args.model, run, rid, var_id, spec, var, steps,
+                                                  regions, regions_cfg, store, tmp)
+                continue
             log.info("Scarico %s (%s)", var_id, spec["param"])
             grib = src.download(m, run, spec, steps, Path(tmp) / f"{var_id}.grib2")
             da = open_param(grib, spec.get("short", spec["param"]))
@@ -88,8 +132,7 @@ def ingest(args) -> int:
                 for region_id in regions:
                     img = render_map(
                         crop(field, regions_cfg[region_id]["bbox"]), var, regions_cfg[region_id],
-                        {"model_label": m["label"], "run": run, "step": hours,
-                         "valid": valid, "attribution": m["attribution"]},
+                        _meta(m, run, hours, valid),
                     )
                     store.put(naming.image_key(args.model, rid, region_id, var_id, hours), img, "image/webp", IMG_CACHE)
                 produced[var_id].append(hours)

@@ -9,6 +9,29 @@ import pandas as pd
 from wr_pipeline import cli, config, naming
 
 
+class FakeField:
+    """Imita il minimo di un DataArray usato dal flusso vettoriale."""
+
+    class _C:
+        values = None
+
+    latitude = _C()
+    longitude = _C()
+    values = None
+
+    def __getitem__(self, key):
+        return self
+
+    def __pow__(self, other):
+        return self
+
+    def __add__(self, other):
+        return self
+
+    def __mul__(self, other):
+        return self
+
+
 def _install_fakes(monkeypatch):
     seen = {"steps": [], "calls": []}
 
@@ -29,14 +52,17 @@ def _install_fakes(monkeypatch):
         for h in seen["steps"]:
             if var.get("skip_step0") and h == 0:
                 continue
-            yield h, pd.Timestamp("2026-11-04") + pd.Timedelta(hours=h), object()
+            yield h, pd.Timestamp("2026-11-04") + pd.Timedelta(hours=h), FakeField()
 
     ext.iter_fields = iter_fields
+    wnd = types.ModuleType("wr_pipeline.process.wind")
+    wnd.wind_json = lambda *a, **k: b"[]"
     rnd = types.ModuleType("wr_pipeline.render.maps")
     rnd.render_map = lambda *a, **k: b"img"
 
     monkeypatch.setitem(sys.modules, "fake_src", src)
     monkeypatch.setitem(sys.modules, "wr_pipeline.process.extract", ext)
+    monkeypatch.setitem(sys.modules, "wr_pipeline.process.wind", wnd)
     monkeypatch.setitem(sys.modules, "wr_pipeline.render.maps", rnd)
     monkeypatch.setitem(cli.SOURCES, "ecmwf_opendata", "fake_src")
     return seen
@@ -61,7 +87,9 @@ def test_partial_then_complete_is_additive(monkeypatch, tmp_path):
     assert list(m["vars"]) == list(config.load("models")["ecmwf-ifs"]["params"])
     assert max(m["vars"]["z500"]["steps"]) == 144
     assert m["vars"]["tp-acc"]["steps"][0] == 3  # lo step 0 viene saltato
-    assert len(seen["calls"]) == 6
+    assert len(seen["calls"]) == 8  # 6 scalari + vento (u e v)
+    assert (tmp_path / naming.data_key("ecmwf-ifs", "2026110400", "eu", "wind10m", 24)).exists()
+    assert m["vars"]["wind10m"]["json_regions"] == ["eu"]
 
     # terzo giro: tutto completo, non scarica nulla
     seen["calls"].clear()
@@ -74,5 +102,5 @@ def test_forced_partial_keeps_other_vars(monkeypatch, tmp_path):
     base = ["ingest", "--model", "ecmwf-ifs", "--run", "latest", "--local", str(tmp_path)]
     assert cli.main(base) == 0
     assert cli.main(base + ["--vars", "t850", "--force"]) == 0
-    assert len(_manifest(tmp_path)["vars"]) == 6  # le altre non spariscono
+    assert len(_manifest(tmp_path)["vars"]) == 7  # le altre non spariscono
     assert (tmp_path / naming.image_key("ecmwf-ifs", "2026110400", "it", "t2m", 0)).exists()
