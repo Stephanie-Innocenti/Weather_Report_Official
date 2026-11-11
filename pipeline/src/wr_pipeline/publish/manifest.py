@@ -30,6 +30,7 @@ def write_run_manifest(store, model_id, model_cfg, run, regions_cfg, vars_cfg, p
         "generated": _now(),
         "attribution": model_cfg["attribution"],
         "regions": {r: {"label": regions_cfg[r]["label"], "bbox": regions_cfg[r]["bbox"]} for r in regions},
+        "planned_countries": regions_cfg.get("planned_countries", {}),
         "vars": {v: _var_info(vars_cfg[v], steps, regions) for v, steps in produced.items()},
     }
     store.put(run_manifest_key(model_id, run), json.dumps(manifest, ensure_ascii=False).encode(), JSON, RUN_CACHE)

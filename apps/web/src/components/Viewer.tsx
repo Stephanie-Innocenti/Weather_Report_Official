@@ -34,23 +34,37 @@ export default function Viewer() {
   const [variable, setVariable] = useState("");
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [showPlannedCountries, setShowPlannedCountries] = useState(false);
   const [speed, setSpeed] = useState(600);
   const [error, setError] = useState<string | null>(null);
   const preload = useRef<HTMLImageElement[]>([]);
 
   useEffect(() => {
-    fetchLatest()
+    let cancelled = false;
+    const refresh = () => fetchLatest()
       .then((l) => {
+        if (cancelled) return;
         setLatest(l);
-        setModel(Object.keys(l.models)[0] ?? "");
+        setModel((current) => current in l.models ? current : Object.keys(l.models)[0] ?? "");
+        setError(null);
       })
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      });
+    void refresh();
+    const timer = setInterval(() => void refresh(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
+  const selectedRun = latest?.models[model]?.run;
+
   useEffect(() => {
-    if (!latest || !model) return;
+    if (!selectedRun || !model) return;
     let cancelled = false;
-    fetchRun(model, latest.models[model].run)
+    fetchRun(model, selectedRun)
       .then((r) => {
         if (cancelled) return;
         setRun(r);
@@ -64,7 +78,7 @@ export default function Viewer() {
     return () => {
       cancelled = true;
     };
-  }, [latest, model]);
+  }, [model, selectedRun]);
 
   const steps = useMemo(() => run?.vars[variable]?.steps ?? [], [run, variable]);
   const i = Math.min(idx, Math.max(steps.length - 1, 0));
@@ -140,7 +154,6 @@ export default function Viewer() {
       <div className="weather-body">
         <aside className="rail" aria-label="Selezione previsione">
           <section className="control-card">
-            <span className="control-step">01</span>
             <Choice
               label="Modello"
               value={model}
@@ -152,7 +165,6 @@ export default function Viewer() {
             />
           </section>
           <section className="control-card">
-            <span className="control-step">02</span>
             <Choice
               label="Parametro"
               value={variable}
@@ -164,13 +176,31 @@ export default function Viewer() {
             />
           </section>
           <section className="control-card">
-            <span className="control-step">03</span>
             <Choice
               label="Area"
               value={region}
               options={Object.entries(run.regions).map(([id, r]) => ({ id, text: r.label }))}
               onChange={setRegion}
             />
+            <button
+              type="button"
+              className="choice other-areas-toggle"
+              aria-expanded={showPlannedCountries}
+              aria-controls="planned-countries"
+              onClick={() => setShowPlannedCountries((visible) => !visible)}
+            >
+              Altri Paesi europei <span aria-hidden="true">{showPlannedCountries ? "−" : "+"}</span>
+            </button>
+            {showPlannedCountries && (
+              <div id="planned-countries" className="planned-countries">
+                <p className="planned-countries-note">Mappe non ancora pubblicate.</p>
+                {Object.entries(run.planned_countries ?? {}).map(([id, label]) => (
+                  <button key={id} type="button" className="choice unavailable" disabled>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
           <p className="sidebar-note">Nuove mappe e parametri si attivano quando il run è pubblicato.</p>
         </aside>

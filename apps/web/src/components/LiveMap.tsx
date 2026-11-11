@@ -205,7 +205,7 @@ export default function LiveMap() {
     };
   }, [ready, snow]);
 
-  // radar Radar-DPC: ultimo campione, ricreato ogni 5 minuti
+  // Radar-DPC pubblica l'ultimo campione; cambia URL per evitare tile memorizzate nella cache.
   useEffect(() => {
     const L = libRef.current;
     const map = mapRef.current;
@@ -216,12 +216,14 @@ export default function LiveMap() {
       layer = L.tileLayer
         .wms(RADAR_URL, {
           layers: `radar:${radarProduct}`, format: "image/png", transparent: true, version: "1.1.1", tiled: true,
+          _wr_refresh: Date.now(),
           opacity: 0.85, pane: "radar",
           attribution: "Radar-DPC © Dipartimento della Protezione Civile (CC BY-SA 4.0)",
         } as never)
         .addTo(map) as unknown as Removable;
     };
     make();
+    // Il cursore cambia la previsione del vento, non le osservazioni radar.
     const t = setInterval(make, 5 * 60 * 1000);
     return () => {
       clearInterval(t);
@@ -230,18 +232,31 @@ export default function LiveMap() {
   }, [ready, radar, radarProduct]);
 
   useEffect(() => {
-    fetchLatest()
+    let cancelled = false;
+    const refresh = () => fetchLatest()
       .then((l) => {
+        if (cancelled) return;
         setLatest(l);
-        setModel(Object.keys(l.models)[0] ?? "");
+        setModel((current) => current in l.models ? current : Object.keys(l.models)[0] ?? "");
+        setError(null);
       })
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      });
+    void refresh();
+    const timer = setInterval(() => void refresh(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
+  const selectedRun = latest?.models[model]?.run;
+
   useEffect(() => {
-    if (!latest || !model) return;
+    if (!selectedRun || !model) return;
     let cancelled = false;
-    fetchRun(model, latest.models[model].run)
+    fetchRun(model, selectedRun)
       .then((r) => {
         if (cancelled) return;
         setRun(r);
@@ -254,7 +269,7 @@ export default function LiveMap() {
     return () => {
       cancelled = true;
     };
-  }, [latest, model]);
+  }, [model, selectedRun]);
 
   const windVar = useMemo(() => {
     if (!run) return null;
@@ -372,7 +387,9 @@ export default function LiveMap() {
             <option value={450}>Veloce</option>
           </select>
         </div>
-        <p className="attr">{run.attribution}. Satellite e radar sono osservazioni in tempo reale, indipendenti dallo slider.</p>
+        <p className="attr">
+          {run.attribution}. Il cursore anima il vento previsto; il radar mostra l’ultimo dato disponibile.
+        </p>
       </>
     );
   }

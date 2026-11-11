@@ -110,6 +110,11 @@ def ingest(args) -> int:
     if not args.force:
         todo = [v for v in var_ids if not complete(v)]
         if not todo:
+            if old.get("planned_countries") != regions_cfg.get("planned_countries", {}):
+                existing = {v: info["steps"] for v, info in old["vars"].items()}
+                mf.write_run_manifest(
+                    store, args.model, m, rid, regions_cfg, vars_cfg, existing, list(old["regions"])
+                )
             log.info("Run gia' completo, niente da fare (usa --force per rigenerare)")
             return 0
         if len(todo) < len(var_ids):

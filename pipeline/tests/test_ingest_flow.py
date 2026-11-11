@@ -7,6 +7,7 @@ import types
 import pandas as pd
 
 from wr_pipeline import cli, config, naming
+from wr_pipeline.sources import noaa_gfs
 
 
 class FakeField:
@@ -72,6 +73,30 @@ def _manifest(tmp_path):
     return json.loads((tmp_path / "ecmwf-ifs/2026110400/manifest.json").read_text())
 
 
+def test_available_gfs_runs_are_returned_oldest_first(monkeypatch):
+    real_datetime = dt.datetime
+
+    class FixedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 11, 16, 30, tzinfo=tz)
+
+    statuses = iter([404, 200, 200])
+    monkeypatch.setattr(noaa_gfs.dt, "datetime", FixedDateTime)
+    monkeypatch.setattr(
+        noaa_gfs._session,
+        "head",
+        lambda url, timeout: types.SimpleNamespace(status_code=next(statuses)),
+    )
+
+    runs = noaa_gfs.available_runs(144, limit=2)
+
+    assert runs == [
+        real_datetime(2026, 11, 11, 0),
+        real_datetime(2026, 11, 11, 6),
+    ]
+
+
 def test_partial_then_complete_is_additive(monkeypatch, tmp_path):
     seen = _install_fakes(monkeypatch)
     out = str(tmp_path)
@@ -90,11 +115,17 @@ def test_partial_then_complete_is_additive(monkeypatch, tmp_path):
     assert len(seen["calls"]) == 10  # 8 scalari + vento (u e v)
     assert (tmp_path / naming.data_key("ecmwf-ifs", "2026110400", "eu", "wind10m", 24)).exists()
     assert m["vars"]["wind10m"]["json_regions"] == ["eu"]
+    assert m["planned_countries"]["al"] == "Albania"
+    assert "al" not in m["regions"]
 
     # terzo giro: tutto completo, non scarica nulla
     seen["calls"].clear()
+    existing_manifest = _manifest(tmp_path)
+    existing_manifest.pop("planned_countries")
+    (tmp_path / "ecmwf-ifs/2026110400/manifest.json").write_text(json.dumps(existing_manifest))
     assert cli.main(base) == 0
     assert seen["calls"] == []
+    assert _manifest(tmp_path)["planned_countries"]["al"] == "Albania"
 
 
 def test_forced_partial_keeps_other_vars(monkeypatch, tmp_path):

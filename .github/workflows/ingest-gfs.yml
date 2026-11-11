@@ -2,8 +2,8 @@ name: ingest-gfs
 
 on:
   schedule:
-    # GFS: run 00/06/12/18 UTC, disponibili dopo circa 3,5-5 ore. Job idempotente.
-    - cron: "20 4-6,10-12,16-18,22,23,0 * * *"
+    # Due controlli per finestra: recupera anche se il primo evento viene ritardato o perso.
+    - cron: "20,40 4-6,10-12,16-18,22,23,0 * * *"
   workflow_dispatch:
     inputs:
       run:
@@ -56,4 +56,12 @@ jobs:
           FORCE: ${{ inputs.force && '--force' || '' }}
           VARS: ${{ inputs.vars && format('--vars {0}', inputs.vars) || '' }}
           STEPS: ${{ inputs.steps_max && format('--steps-max {0}', inputs.steps_max) || '' }}
-        run: wr ingest --model gfs --run "$RUN" $FORCE $VARS $STEPS
+        run: |
+          if [ "$RUN" = "latest" ] && [ -z "$FORCE" ] && [ -z "$VARS" ] && [ -z "$STEPS" ]; then
+            RUNS="$(python -c 'from wr_pipeline import config; from wr_pipeline.sources.noaa_gfs import available_runs; cfg=config.load("models")["gfs"]; print(" ".join(run.strftime("%Y%m%d%H") for run in available_runs(cfg["steps"]["stop"], 2)))')"
+            for candidate in $RUNS; do
+              wr ingest --model gfs --run "$candidate"
+            done
+          else
+            wr ingest --model gfs --run "$RUN" $FORCE $VARS $STEPS
+          fi

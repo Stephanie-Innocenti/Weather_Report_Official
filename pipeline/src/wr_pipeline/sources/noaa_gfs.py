@@ -49,17 +49,30 @@ def _ranges(url: str, spec: dict) -> list[tuple[int, int | None]]:
     return out
 
 
-def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
-    """Ultimo run il cui ultimo step (max_step) e' gia' stato pubblicato."""
+def available_runs(max_step: int, limit: int = 1) -> list[dt.datetime]:
+    """Ultimi run completi, in ordine cronologico, fino al limite richiesto."""
+    if limit < 1:
+        raise ValueError("limit deve essere almeno 1")
     now = dt.datetime.now(dt.timezone.utc).replace(minute=0, second=0, microsecond=0, tzinfo=None)
     cand = now.replace(hour=now.hour - now.hour % 6)
+    runs = []
     for _ in range(8):  # fino a 2 giorni indietro
         r = _session.head(_url(cand, max_step) + ".idx", timeout=30)
         if r.status_code == 200:
-            log.info("Ultimo run utilizzabile: %s", cand)
-            return cand
+            runs.append(cand)
+            if len(runs) == limit:
+                break
         cand -= dt.timedelta(hours=6)
-    raise RuntimeError("Nessun run GFS completo trovato negli ultimi 2 giorni")
+    if not runs:
+        raise RuntimeError("Nessun run GFS completo trovato negli ultimi 2 giorni")
+    runs.reverse()
+    log.info("Run GFS completi: %s", ", ".join(run.strftime("%Y%m%d%H") for run in runs))
+    return runs
+
+
+def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
+    """Ultimo run il cui ultimo step (max_step) e' gia' stato pubblicato."""
+    return available_runs(max_step, 1)[-1]
 
 
 def download(cfg: dict, run: dt.datetime, spec: dict, steps: list[int], target: Path) -> Path:

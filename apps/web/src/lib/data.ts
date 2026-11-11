@@ -22,12 +22,13 @@ export type RunManifest = {
   generated: string;
   attribution: string;
   regions: Record<string, { label: string; bbox: number[] }>;
+  planned_countries?: Record<string, string>;
   vars: Record<string, VarInfo>;
 };
 
 async function getJson<T>(path: string): Promise<T> {
   if (!DATA_URL) throw new Error("NEXT_PUBLIC_DATA_URL non impostata (vedi .env.local)");
-  const res = await fetch(`${DATA_URL}/${path}`);
+  const res = await fetch(`${DATA_URL}/${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Impossibile leggere ${path} (HTTP ${res.status})`);
   return (await res.json()) as T;
 }

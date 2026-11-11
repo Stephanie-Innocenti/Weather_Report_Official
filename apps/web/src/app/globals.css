@@ -95,6 +95,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .choice:hover { border-color: #e8cdbb; background: #fbf3eb; }
 .choice.on { border-color: #d88a66; color: #8d432d; background: #f9e9dc; font-weight: 700; }
 .choice.unavailable, .choice.unavailable:hover { border-color: transparent; color: #93958d; background: transparent; cursor: not-allowed; }
+.other-areas-toggle { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-weight: 600; }
+.planned-countries { display: grid; gap: 2px; padding: 6px 0 0 10px; border-left: 1px solid var(--line); }
+.planned-countries-note { margin: 0 0 4px; color: var(--muted); font-size: .75rem; }
 .sidebar-note { margin: 0; padding: 3px 4px; color: var(--muted); font-size: .76rem; line-height: 1.5; }
 
 .stage { display: flex; flex-direction: column; gap: 13px; min-width: 0; }
