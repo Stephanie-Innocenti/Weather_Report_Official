@@ -22,6 +22,7 @@ def test_configs_consistent():
     for m in models.values():
         assert set(m["params"]) <= set(variables)
         assert set(m["regions"]) <= set(regions)
+        assert {"t500", "snow-depth"} <= set(m["params"])
 
 
 def test_param_spec():

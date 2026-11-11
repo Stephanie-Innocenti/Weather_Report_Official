@@ -87,7 +87,7 @@ def test_partial_then_complete_is_additive(monkeypatch, tmp_path):
     assert list(m["vars"]) == list(config.load("models")["ecmwf-ifs"]["params"])
     assert max(m["vars"]["z500"]["steps"]) == 144
     assert m["vars"]["tp-acc"]["steps"][0] == 3  # lo step 0 viene saltato
-    assert len(seen["calls"]) == 8  # 6 scalari + vento (u e v)
+    assert len(seen["calls"]) == 10  # 8 scalari + vento (u e v)
     assert (tmp_path / naming.data_key("ecmwf-ifs", "2026110400", "eu", "wind10m", 24)).exists()
     assert m["vars"]["wind10m"]["json_regions"] == ["eu"]
 
@@ -102,5 +102,5 @@ def test_forced_partial_keeps_other_vars(monkeypatch, tmp_path):
     base = ["ingest", "--model", "ecmwf-ifs", "--run", "latest", "--local", str(tmp_path)]
     assert cli.main(base) == 0
     assert cli.main(base + ["--vars", "t850", "--force"]) == 0
-    assert len(_manifest(tmp_path)["vars"]) == 7  # le altre non spariscono
+    assert len(_manifest(tmp_path)["vars"]) == 9  # le altre non spariscono
     assert (tmp_path / naming.image_key("ecmwf-ifs", "2026110400", "it", "t2m", 0)).exists()

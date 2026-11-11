@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchLatest, fetchRun, imageUrl, runStart, type Latest, type RunManifest } from "@/lib/data";
 
-type Option = { id: string; text: string };
+type Option = { id: string; text: string; disabled?: boolean };
 
 function Choice(props: { label: string; value: string; options: Option[]; onChange: (v: string) => void }) {
   return (
@@ -15,7 +15,8 @@ function Choice(props: { label: string; value: string; options: Option[]; onChan
           key={o.id}
           role="radio"
           aria-checked={o.id === props.value}
-          className={o.id === props.value ? "choice on" : "choice"}
+          className={`choice${o.id === props.value ? " on" : ""}${o.disabled ? " unavailable" : ""}`}
+          disabled={o.disabled}
           onClick={() => props.onChange(o.id)}
         >
           {o.text}
@@ -117,79 +118,120 @@ export default function Viewer() {
   };
   const runFmt: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", hour: "2-digit", timeZone: "UTC" };
   const v = run.vars[variable];
+  const variableOptions: Option[] = Object.entries(run.vars).map(([id, info]) => ({ id, text: info.label }));
+  for (const [id, label] of [
+    ["snow-depth", "Neve accumulata al suolo"],
+    ["t500", "Temperatura a 500 hPa"],
+  ]) {
+    if (!run.vars[id]) variableOptions.push({ id, text: `${label} · in attesa dei dati`, disabled: true });
+  }
 
   return (
-    <div className="shell">
-      <aside className="rail">
-        <h1 className="brand">
-          Weather Report <span>Official</span>
-        </h1>
-        <Link className="navlink" href="/live">Mappa live del vento →</Link>
-        <Choice
-          label="Modello"
-          value={model}
-          options={Object.entries(latest.models).map(([id, m]) => ({ id, text: m.label }))}
-          onChange={setModel}
-        />
-        <Choice
-          label="Parametro"
-          value={variable}
-          options={Object.entries(run.vars).map(([id, x]) => ({ id, text: x.label }))}
-          onChange={setVariable}
-        />
-        <Choice
-          label="Area"
-          value={region}
-          options={Object.entries(run.regions).map(([id, r]) => ({ id, text: r.label }))}
-          onChange={setRegion}
-        />
-      </aside>
-
-      <main className="stage">
-        <header className="readout">
-          <p className="when">{valid ? `${valid.toLocaleString("it-IT", whenFmt)} UTC` : "—"}</p>
-          <p className="meta">
-            Run delle {start.toLocaleString("it-IT", runFmt)} UTC, previsione a +{step ?? 0} ore
-          </p>
-        </header>
-
-        <div className="frame">
-          {step !== undefined && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl(run, region, variable, step)} alt={`${v?.label}, ${run.regions[region]?.label}, +${step} ore`} />
-          )}
+    <div className="weather-shell">
+      <header className="season-banner">
+        <div className="season-copy">
+          <p className="season-kicker">Previsioni · modelli numerici</p>
+          <h1>Weather Report</h1>
+          <p>Leggi il tempo che arriva, un run alla volta.</p>
         </div>
+        <Link className="season-link" href="/live">Apri la mappa live <span aria-hidden="true">↗</span></Link>
+      </header>
 
-        <div className="player">
-          <button onClick={() => setIdx((n) => Math.max(n - 1, 0))} aria-label="Step precedente" disabled={i === 0}>
-            ‹
-          </button>
-          <button className="play" onClick={() => setPlaying((p) => !p)}>
-            {playing ? "Pausa" : "Riproduci"}
-          </button>
-          <button onClick={() => setIdx((n) => Math.min(n + 1, steps.length - 1))} aria-label="Step successivo" disabled={i >= steps.length - 1}>
-            ›
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(steps.length - 1, 0)}
-            value={i}
-            onChange={(e) => {
-              setPlaying(false);
-              setIdx(Number(e.target.value));
-            }}
-            aria-label="Ora di previsione"
-          />
-          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Velocità animazione">
-            <option value={1200}>Lenta</option>
-            <option value={600}>Normale</option>
-            <option value={300}>Veloce</option>
-          </select>
-        </div>
+      <div className="weather-body">
+        <aside className="rail" aria-label="Selezione previsione">
+          <section className="control-card">
+            <span className="control-step">01</span>
+            <Choice
+              label="Modello"
+              value={model}
+              options={Object.entries(latest.models).map(([id, m]) => ({ id, text: m.label }))}
+              onChange={(nextModel) => {
+                setPlaying(false);
+                setModel(nextModel);
+              }}
+            />
+          </section>
+          <section className="control-card">
+            <span className="control-step">02</span>
+            <Choice
+              label="Parametro"
+              value={variable}
+              options={variableOptions}
+              onChange={(nextVariable) => {
+                setPlaying(false);
+                setVariable(nextVariable);
+              }}
+            />
+          </section>
+          <section className="control-card">
+            <span className="control-step">03</span>
+            <Choice
+              label="Area"
+              value={region}
+              options={Object.entries(run.regions).map(([id, r]) => ({ id, text: r.label }))}
+              onChange={setRegion}
+            />
+          </section>
+          <p className="sidebar-note">Nuove mappe e parametri si attivano quando il run è pubblicato.</p>
+        </aside>
 
-        <p className="attr">{run.attribution}. Frecce per scorrere, barra spaziatrice per l’animazione.</p>
-      </main>
+        <main className="stage">
+          <section className="forecast-card">
+            <header className="forecast-head">
+              <div>
+                <p className="forecast-kicker">{run.label} <span>·</span> {run.regions[region]?.label}</p>
+                <h2 className="when">{valid ? `${valid.toLocaleString("it-IT", whenFmt)} UTC` : "—"}</h2>
+                <p className="meta">
+                  Run delle {start.toLocaleString("it-IT", runFmt)} UTC · previsione a +{step ?? 0} ore
+                </p>
+              </div>
+            </header>
+
+            <div className="frame">
+              {step !== undefined && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl(run, region, variable, step)} alt={`${v?.label}, ${run.regions[region]?.label}, +${step} ore`} />
+              )}
+            </div>
+
+            <div className="frame-caption">
+              <strong>{v?.label}</strong>
+              <span>{v?.unit} <span aria-hidden="true">·</span> {run.attribution}</span>
+            </div>
+          </section>
+
+          <section className="player-card" aria-label="Controlli animazione">
+            <div className="player">
+              <button onClick={() => setIdx((n) => Math.max(n - 1, 0))} aria-label="Step precedente" disabled={i === 0}>
+                ‹
+              </button>
+              <button className="play" onClick={() => setPlaying((p) => !p)}>
+                {playing ? "Pausa" : "Riproduci"}
+              </button>
+              <button onClick={() => setIdx((n) => Math.min(n + 1, steps.length - 1))} aria-label="Step successivo" disabled={i >= steps.length - 1}>
+                ›
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(steps.length - 1, 0)}
+                value={i}
+                onChange={(e) => {
+                  setPlaying(false);
+                  setIdx(Number(e.target.value));
+                }}
+                aria-label="Ora di previsione"
+              />
+              <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Velocità animazione">
+                <option value={1200}>Lenta</option>
+                <option value={600}>Normale</option>
+                <option value={300}>Veloce</option>
+              </select>
+            </div>
+            <p className="attr">Usa le frecce o la barra spaziatrice per controllare l’animazione.</p>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

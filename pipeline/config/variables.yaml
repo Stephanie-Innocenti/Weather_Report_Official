@@ -55,6 +55,26 @@ t850:
   stops: [[-30,"#3a0a5c"],[-22,"#5a2ca0"],[-14,"#2f55d4"],[-7,"#3f93f0"],[-0.1,"#a9ddf5"],[0.1,"#b8e8a6"],[6,"#79cf6c"],[12,"#f4e65a"],[18,"#f7a53b"],[24,"#e2432b"],[30,"#a1122a"]]
   levels: [-30, 30, 3]
   extend: both
+t500:
+  label: "Temperatura a 500 hPa"
+  unit: "°C"
+  scale: 1
+  offset: -273.15
+  kind: fill
+  stops: [[-50,"#39206f"],[-40,"#3e5fca"],[-30,"#43a4df"],[-20,"#8ed8d2"],[-10,"#d4e58b"],[0,"#f5c45c"],[10,"#e97843"]]
+  levels: [-50, 10, 2]
+  lines: [-50, 10, 5]
+  extend: both
+snow-depth:
+  label: "Neve accumulata al suolo"
+  unit: "cm"
+  scale: 100
+  offset: 0
+  kind: fill
+  levels_list: [0.1, 1, 2, 5, 10, 20, 40, 60, 100]
+  colors: ["#d9f0ff", "#9bd5f5", "#5aafe4", "#4385d0", "#7869c6", "#a75caf", "#d05d98", "#ed815c", "#8d4056"]
+  extend: max
+  mask_below: 0.1
 wind10m:
   label: "Vento a 10 m"
   unit: "km/h"
