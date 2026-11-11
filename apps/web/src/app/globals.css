@@ -63,7 +63,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .live { position: relative; height: 100vh; }
 .live-map { position: absolute; inset: 0; background: #0f1720; }
 .live-panel { position: absolute; z-index: 1100; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .85rem 1rem; box-shadow: 0 2px 12px rgb(0 0 0 / .18); }
-.live-panel.top { top: 1rem; left: 1rem; width: 15rem; display: flex; flex-direction: column; gap: .85rem; }
+.live-panel.top { top: 1rem; left: 1rem; z-index: 1200; width: 15rem; max-height: calc(100vh - 12rem); overflow-y: auto; display: flex; flex-direction: column; gap: .85rem; }
 .live-panel.bottom { left: 50%; transform: translateX(-50%); bottom: 1.25rem; width: min(46rem, calc(100% - 2rem)); display: flex; flex-direction: column; gap: .6rem; }
 .live-panel .readout .when { font-size: clamp(1.1rem, 2.4vw, 1.5rem); }
 .live-panel p { margin: 0; }

@@ -14,14 +14,18 @@ type Removable = { remove: () => unknown };
 type RegionId = "eu" | "it";
 
 // Vista bloccata sulla regione (come una carta meteo): zoom minimo = inquadratura, massimo = +3
-const REGIONS: Record<RegionId, { label: string; view: [[number, number], [number, number]]; satWidth: number }> = {
-  eu: { label: "Europa", view: [[33, -13], [61, 37]], satWidth: 2000 },
-  it: { label: "Italia", view: [[35.2, 6.2], [47.3, 19.0]], satWidth: 1800 },
+const REGIONS: Record<RegionId, { label: string; view: [[number, number], [number, number]] }> = {
+  eu: { label: "Europa", view: [[33, -13], [61, 37]] },
+  it: { label: "Italia", view: [[35.2, 6.2], [47.3, 19.0]] },
 };
 
-// Satellite EUMETSAT (MTG GeoColour + coste), richiesto come UNA immagine allineata alla regione
+// Satellite EUMETSAT in tile WMS: mantiene la proiezione corretta e non crea una singola immagine stirata
 const SAT_URL = "https://view.eumetsat.int/geoserver/wms";
-const SAT_LAYERS = "mtg_fd:rgb_geocolour,backgrounds:ne_10m_coastline";
+const SAT_LAYER = "mtg_fd:rgb_geocolour";
+
+// Copertura nevosa osservata da satellite (NASA GIBS MODIS Terra)
+const SNOW_URL = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi";
+const SNOW_LAYER = "MODIS_Terra_NDSI_Snow_Cover";
 
 // Radar nazionale Radar-DPC (Protezione Civile), licenza CC BY-SA 4.0
 const RADAR_URL = "https://radar-geowebcache.protezionecivile.it/service/wms";
@@ -31,30 +35,17 @@ const RADAR_PRODUCTS = [
 ];
 
 const WIND_COLORS = ["#a8dcf5", "#79cf6c", "#f4e65a", "#f7a53b", "#e2432b", "#c0267a", "#8c2d8f"];
-const R = 6378137;
-const mercX = (lon: number) => (lon * Math.PI * R) / 180;
-const mercY = (lat: number) => R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
-
-function satUrl(b: { south: number; west: number; north: number; east: number }, width: number, bust: number) {
-  const x1 = mercX(b.west), x2 = mercX(b.east), y1 = mercY(b.south), y2 = mercY(b.north);
-  const q = new URLSearchParams({
-    service: "WMS", version: "1.3.0", request: "GetMap", layers: SAT_LAYERS, styles: "",
-    format: "image/jpeg", transparent: "false", crs: "EPSG:3857",
-    bbox: `${x1},${y1},${x2},${y2}`, width: String(width), height: String(Math.round(((y2 - y1) / (x2 - x1)) * width)),
-    t: String(bust),
-  });
-  return `${SAT_URL}?${q}`;
-}
 
 // Base cartografica: OpenFreeMap (vettoriale, senza chiave) tramite MapLibre; senza WebGL ripiega su tile raster Esri
 async function addBasemap(L: LeafletLib, map: LeafletMap) {
   try {
     const maplibre = await import("maplibre-gl");
+    maplibre.setWorkerUrl("/maplibre-gl-worker.mjs");
     (window as unknown as { maplibregl: unknown }).maplibregl =
       (maplibre as unknown as { default?: unknown }).default ?? maplibre;
     await import("@maplibre/maplibre-gl-leaflet");
     (L as unknown as { maplibreGL: (o: object) => { addTo: (m: LeafletMap) => void } })
-      .maplibreGL({ style: "https://tiles.openfreemap.org/styles/dark" })
+      .maplibreGL({ style: "https://tiles.openfreemap.org/styles/dark", attributionControl: false })
       .addTo(map);
     map.attributionControl.addAttribution(
       '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © ' +
@@ -83,6 +74,7 @@ export default function LiveMap() {
   const [run, setRun] = useState<RunManifest | null>(null);
   const [region, setRegion] = useState<RegionId>("eu");
   const [sat, setSat] = useState(true);
+  const [snow, setSnow] = useState(false);
   const [radar, setRadar] = useState(false);
   const [radarProduct, setRadarProduct] = useState("vmi");
   const [idx, setIdx] = useState(0);
@@ -112,6 +104,9 @@ export default function LiveMap() {
       const radarPane = map.createPane("radar");
       radarPane.style.zIndex = "300";
       radarPane.style.pointerEvents = "none";
+      const snowPane = map.createPane("snow");
+      snowPane.style.zIndex = "350";
+      snowPane.style.pointerEvents = "none";
       await addBasemap(L, map);
       if (disposed) return;
       libRef.current = L;
@@ -145,22 +140,70 @@ export default function LiveMap() {
     map.setMaxBounds(b.pad(0.2));
   }, [ready, region]);
 
-  // satellite di sfondo: una sola immagine allineata alla regione, aggiornata ogni 10 minuti
+  // satellite EUMETSAT: tile WMS in EPSG:3857, aggiornati ogni 10 minuti
   useEffect(() => {
     const L = libRef.current;
     const map = mapRef.current;
     if (!ready || !L || !map || !sat) return;
-    const b = L.latLngBounds(REGIONS[region].view).pad(0.25);
-    const bb = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
-    const width = REGIONS[region].satWidth;
-    const layer = L.imageOverlay(satUrl(bb, width, Date.now()), b, { pane: "sat", interactive: false, attribution: "© EUMETSAT" });
-    layer.addTo(map);
-    const t = setInterval(() => layer.setUrl(satUrl(bb, width, Date.now())), 10 * 60 * 1000);
+    const layer = L.tileLayer.wms(SAT_URL, {
+      layers: SAT_LAYER,
+      styles: "raster",
+      format: "image/png",
+      transparent: true,
+      version: "1.1.1",
+      pane: "sat",
+      attribution: "© EUMETSAT",
+    }).addTo(map);
+    let retries = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = (retry = false) => {
+      const now = new Date();
+      if (!retry) now.setUTCMinutes(Math.floor(now.getUTCMinutes() / 10) * 10, 0, 0);
+      const params: import("leaflet").WMSParams & { time: string } = {
+        layers: SAT_LAYER,
+        time: now.toISOString(),
+      };
+      layer.setParams(params);
+    };
+    const retryFailedTiles = () => {
+      if (retryTimer || retries >= 3) return;
+      retries += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        refresh(true);
+      }, retries * 1000);
+    };
+    layer.on("tileerror", retryFailedTiles);
+    const t = setInterval(() => refresh(), 10 * 60 * 1000);
     return () => {
       clearInterval(t);
-      (layer as unknown as Removable).remove();
+      if (retryTimer) clearTimeout(retryTimer);
+      layer.off("tileerror", retryFailedTiles);
+      layer.remove();
     };
-  }, [ready, region, sat]);
+  }, [ready, sat]);
+
+  // copertura nevosa osservata: il servizio NASA seleziona l'ultima acquisizione disponibile
+  useEffect(() => {
+    const L = libRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map || !snow) return;
+    const layer = L.tileLayer
+      .wms(SNOW_URL, {
+        layers: SNOW_LAYER,
+        format: "image/png",
+        transparent: true,
+        version: "1.1.1",
+        tiled: true,
+        opacity: 0.8,
+        pane: "snow",
+        attribution: "Copertura nevosa © NASA GIBS / MODIS",
+      } as never)
+      .addTo(map) as unknown as Removable;
+    return () => {
+      layer.remove();
+    };
+  }, [ready, snow]);
 
   // radar Radar-DPC: ultimo campione, ricreato ogni 5 minuti
   useEffect(() => {
@@ -240,6 +283,7 @@ export default function LiveMap() {
       }
       return p;
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     load(step)
       .then((data) => {
@@ -376,6 +420,10 @@ export default function LiveMap() {
           <label className="check">
             <input type="checkbox" checked={sat} onChange={(e) => setSat(e.target.checked)} />
             Satellite (EUMETSAT)
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={snow} onChange={(e) => setSnow(e.target.checked)} />
+            Neve osservata (NASA MODIS)
           </label>
           <label className="check">
             <input type="checkbox" checked={radar} onChange={(e) => setRadar(e.target.checked)} />
