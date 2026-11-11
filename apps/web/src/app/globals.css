@@ -68,3 +68,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .live-panel .readout .when { font-size: clamp(1.1rem, 2.4vw, 1.5rem); }
 .live-panel p { margin: 0; }
 @media (max-width: 760px) { .live-panel.top { width: calc(100% - 2rem); } }
+.check { display: flex; align-items: center; gap: .5rem; font-size: .9rem; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+.live-panel select { padding: .3rem .5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.live-panel .sub { margin-left: 1.5rem; }
