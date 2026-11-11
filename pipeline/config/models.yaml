@@ -37,7 +37,7 @@ gfs:
     z850: { param: "HGT", level: "850 mb", short: "gh" }
     t850: { param: "TMP", level: "850 mb", short: "t" }
     t500: { param: "TMP", level: "500 mb", short: "t" }
-    snow-depth: { param: "SNOD", level: "surface", short: "snod" }
+    snow-depth: { param: "SNOD", level: "surface", short: "sde" }
     wind10m:
       u: { param: "UGRD", level: "10 m above ground", short: "10u" }
       v: { param: "VGRD", level: "10 m above ground", short: "10v" }

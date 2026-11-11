@@ -11,7 +11,11 @@ def open_param(grib_path, short_name: str) -> xr.DataArray:
     if short_name:  # senza short_name si apre il file cosi' com'e' (file con un solo parametro)
         kwargs["filter_by_keys"] = {"shortName": short_name}
     ds = xr.open_dataset(grib_path, engine="cfgrib", backend_kwargs=kwargs)
-    da = ds[list(ds.data_vars)[0]]
+    data_vars = list(ds.data_vars)
+    if not data_vars:
+        ds.close()
+        raise RuntimeError(f"Nessun campo GRIB con shortName={short_name!r} in {grib_path}")
+    da = ds[data_vars[0]]
     # longitudine 0..360 -> -180..180, assi crescenti
     da = da.assign_coords(longitude=((da.longitude + 180) % 360) - 180)
     da = da.sortby("longitude").sortby("latitude")

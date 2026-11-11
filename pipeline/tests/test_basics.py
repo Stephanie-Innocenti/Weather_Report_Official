@@ -1,6 +1,9 @@
 import datetime as dt
 
+import pytest
+
 from wr_pipeline import config, naming
+from wr_pipeline.process import extract
 
 
 def test_image_key():
@@ -38,3 +41,10 @@ def test_gfs_ranges(monkeypatch):
     assert g._ranges("u", {"param": "HGT", "level": "500 mb"}) == [(100, 249)]
     assert g._ranges("u", {"param": "TMP", "level": "850 mb"}) == [(250, None)]
     assert g._ranges("u", {"param": "TMP", "level": "2 m above ground"}) == []
+
+
+def test_open_param_reports_missing_grib_field(monkeypatch, tmp_path):
+    monkeypatch.setattr(extract.xr, "open_dataset", lambda *args, **kwargs: extract.xr.Dataset())
+
+    with pytest.raises(RuntimeError, match="Nessun campo GRIB con shortName='sde'"):
+        extract.open_param(tmp_path / "empty.grib2", "sde")
