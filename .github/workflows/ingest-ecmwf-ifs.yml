@@ -2,8 +2,8 @@ name: ingest-ecmwf-ifs
 
 on:
   schedule:
-    # I run 00/12 UTC sono disponibili dopo circa 7-9 ore: si prova piu' volte, il job e' idempotente
-    - cron: "20 7-10,19-22 * * *"
+    # Riprova due volte all'ora nelle finestre di disponibilita' dei run 00/12 UTC.
+    - cron: "20,40 7-14,19-23 * * *"
   workflow_dispatch:
     inputs:
       run:
