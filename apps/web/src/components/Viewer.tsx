@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import StepPicker from "@/components/StepPicker";
 import { fetchLatest, fetchRun, imageUrl, runStart, type Latest, type RunManifest } from "@/lib/data";
 
 type Option = { id: string; text: string; disabled?: boolean };
@@ -217,11 +218,21 @@ export default function Viewer() {
               </div>
             </header>
 
-            <div className="frame">
-              {step !== undefined && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl(run, region, variable, step)} alt={`${v?.label}, ${run.regions[region]?.label}, +${step} ore`} />
-              )}
+            <div className="forecast-map">
+              <div className="frame">
+                {step !== undefined && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imageUrl(run, region, variable, step)} alt={`${v?.label}, ${run.regions[region]?.label}, +${step} ore`} />
+                )}
+              </div>
+              <StepPicker
+                steps={steps}
+                current={step}
+                onSelect={(s) => {
+                  setPlaying(false);
+                  setIdx(Math.max(steps.indexOf(s), 0));
+                }}
+              />
             </div>
 
             <div className="frame-caption">

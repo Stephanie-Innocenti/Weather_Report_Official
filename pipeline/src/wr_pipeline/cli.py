@@ -38,6 +38,13 @@ def _meta(m: dict, run, hours: int, valid) -> dict:
     return {"model_label": m["label"], "run": run, "step": hours, "valid": valid, "attribution": m["attribution"]}
 
 
+def _regions_for_model(regions_cfg: dict, model_cfg: dict) -> dict:
+    regions = dict(regions_cfg)
+    for region_id, bbox in model_cfg.get("region_bboxes", {}).items():
+        regions[region_id] = {**regions_cfg[region_id], "bbox": bbox}
+    return regions
+
+
 def _ingest_vector(src, m, model, run, rid, var_id, spec, var, steps, regions, regions_cfg, store, tmp) -> list[int]:
     """Vento: scarica u e v, produce l'immagine (velocita' + frecce) e, per le regioni indicate, il JSON per la mappa live."""
     from .process.extract import crop, iter_fields, open_param
@@ -78,6 +85,7 @@ def ingest(args) -> int:
         log.error("Modello non abilitato: %s", args.model)
         return 2
     m = models[args.model]
+    model_regions_cfg = _regions_for_model(regions_cfg, m)
     src = _source(m["source"])
     all_steps = config.expand_steps(m["steps"])
     steps = config.expand_steps(m["steps"], args.steps_max)
@@ -113,7 +121,7 @@ def ingest(args) -> int:
             if old.get("planned_countries") != regions_cfg.get("planned_countries", {}):
                 existing = {v: info["steps"] for v, info in old["vars"].items()}
                 mf.write_run_manifest(
-                    store, args.model, m, rid, regions_cfg, vars_cfg, existing, list(old["regions"])
+                    store, args.model, m, rid, model_regions_cfg, vars_cfg, existing, list(old["regions"])
                 )
             log.info("Run gia' completo, niente da fare (usa --force per rigenerare)")
             return 0
@@ -127,7 +135,7 @@ def ingest(args) -> int:
             spec, var = specs[var_id], _effective_var(vars_cfg[var_id], specs[var_id])
             if var["kind"] == "vector":
                 produced[var_id] = _ingest_vector(src, m, args.model, run, rid, var_id, spec, var, steps,
-                                                  regions, regions_cfg, store, tmp)
+                                                  regions, model_regions_cfg, store, tmp)
                 continue
             log.info("Scarico %s (%s)", var_id, spec["param"])
             grib = src.download(m, run, spec, steps, Path(tmp) / f"{var_id}.grib2")
@@ -136,7 +144,7 @@ def ingest(args) -> int:
             for hours, valid, field in iter_fields(da, var):
                 for region_id in regions:
                     img = render_map(
-                        crop(field, regions_cfg[region_id]["bbox"]), var, regions_cfg[region_id],
+                        crop(field, model_regions_cfg[region_id]["bbox"]), var, model_regions_cfg[region_id],
                         _meta(m, run, hours, valid),
                     )
                     store.put(naming.image_key(args.model, rid, region_id, var_id, hours), img, "image/webp", IMG_CACHE)
@@ -148,7 +156,7 @@ def ingest(args) -> int:
     merged.update(produced)
     merged = {v: merged[v] for v in m["params"] if v in merged}  # ordine come in models.yaml
     regions_all = [r for r in regions_cfg if r in set(old["regions"]) | set(regions)]
-    mf.write_run_manifest(store, args.model, m, rid, regions_cfg, vars_cfg, merged, regions_all)
+    mf.write_run_manifest(store, args.model, m, rid, model_regions_cfg, vars_cfg, merged, regions_all)
     mf.update_latest(store, args.model, m["label"], rid)
     removed = mf.cleanup(store, args.model, keep=2)
     log.info("Fatto. Run rimossi: %s", removed or "nessuno")

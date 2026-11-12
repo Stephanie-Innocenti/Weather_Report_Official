@@ -26,6 +26,19 @@ def test_configs_consistent():
         assert set(m["params"]) <= set(variables)
         assert set(m["regions"]) <= set(regions)
         assert {"t500", "snow-depth"} <= set(m["params"])
+        assert set(m.get("region_bboxes", {})) <= set(m["regions"])
+
+
+def test_model_region_bboxes_do_not_mutate_shared_regions():
+    from wr_pipeline.cli import _regions_for_model
+
+    shared = {"eu": {"label": "Europa", "bbox": [-25, 30, 45, 72]}}
+    model = {"region_bboxes": {"eu": [-23.5, 30, 45, 70.5]}}
+
+    effective = _regions_for_model(shared, model)
+
+    assert effective["eu"]["bbox"] == [-23.5, 30, 45, 70.5]
+    assert shared["eu"]["bbox"] == [-25, 30, 45, 72]
 
 
 def test_param_spec():

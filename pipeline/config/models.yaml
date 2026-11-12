@@ -61,4 +61,6 @@ icon-eu:
     snow-depth: { param: "H_SNOW", short: ~ }
     wind10m: { u: { param: "U_10M", short: ~ }, v: { param: "V_10M", short: ~ } }
   regions: [eu, it]                  # il dominio ICON-EU copre circa 29.5-70.5 N, 23.5 W-62.5 E
+  region_bboxes:
+    eu: [-23.5, 30, 45, 70.5]
   attribution: "Datenbasis: Deutscher Wetterdienst (DWD), ICON-EU - adapted by Weather Report"

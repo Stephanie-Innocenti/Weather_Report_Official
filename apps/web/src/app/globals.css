@@ -95,6 +95,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .choice:hover { border-color: #e8cdbb; background: #fbf3eb; }
 .choice.on { border-color: #d88a66; color: #8d432d; background: #f9e9dc; font-weight: 700; }
 .choice.unavailable, .choice.unavailable:hover { border-color: transparent; color: #93958d; background: transparent; cursor: not-allowed; }
+.forecast-map { margin: 0 12px; overflow: hidden; border: 1px solid #e7e1d7; border-radius: 10px; background: #f7f5ef; }
+.forecast-map .frame { margin: 0; border: 0; border-radius: 0; }
+.forecast-step-picker { padding: 8px; border-top: 1px solid var(--line); background: var(--panel); }
+.forecast-step-list { display: flex; gap: 5px; overflow-x: auto; }
+.forecast-step { width: auto; min-width: 3.5rem; min-height: 34px; flex: none; padding: 6px; text-align: center; font-size: .84rem; font-variant-numeric: tabular-nums; }
 .other-areas-toggle { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-weight: 600; }
 .planned-countries { display: grid; gap: 2px; padding: 6px 0 0 10px; border-left: 1px solid var(--line); }
 .planned-countries-note { margin: 0 0 4px; color: var(--muted); font-size: .75rem; }
@@ -108,7 +113,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .when { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.9rem); font-weight: 700; line-height: 1.2; letter-spacing: -.025em; text-transform: capitalize; }
 .meta { margin: 7px 0 0; color: var(--muted); font-size: .88rem; }
 .frame { min-height: 260px; margin: 0 12px; padding: 10px; display: flex; justify-content: center; align-items: center; overflow: hidden; border: 1px solid #e7e1d7; border-radius: 10px; background: #f7f5ef; }
-.frame img { display: block; width: auto; max-width: 100%; height: auto; max-height: min(69vh, 840px); object-fit: contain; }
+.frame img { display: block; flex: none; width: auto; max-width: 100%; height: auto; max-height: 840px; object-fit: contain; }
 .frame-caption { display: flex; justify-content: space-between; gap: 12px; padding: 12px 22px 16px; color: var(--muted); font-size: .76rem; }
 .frame-caption strong { color: var(--ink); font-size: .83rem; }
 .frame-caption > span { text-align: right; }
@@ -149,8 +154,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   .choice { padding: 7px; font-size: .82rem; }
   .sidebar-note { grid-column: 1 / -1; }
   .forecast-head { padding: 16px; }
+  .forecast-map { margin: 0 8px; }
   .frame { min-height: 150px; margin: 0 8px; padding: 5px; }
-  .frame img { max-height: 58vh; }
+  .forecast-map .frame { margin: 0; }
   .frame-caption { padding: 10px 16px 14px; }
   .player-card { padding: 12px; }
   .player select { margin-left: 0; }
