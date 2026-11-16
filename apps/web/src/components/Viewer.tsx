@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import StepPicker from "@/components/StepPicker";
+import ThemeControl from "@/components/ThemeControl";
 import { fetchLatest, fetchRun, imageUrl, runStart, type Latest, type RunManifest } from "@/lib/data";
 
 type Option = { id: string; text: string; disabled?: boolean };
@@ -149,7 +150,10 @@ export default function Viewer() {
           <h1>Weather Report</h1>
           <p>Leggi il tempo che arriva, un run alla volta.</p>
         </div>
-        <Link className="season-link" href="/live">Apri la mappa live <span aria-hidden="true">↗</span></Link>
+        <div className="season-actions">
+          <Link className="season-link" href="/live">Apri la mappa live <span aria-hidden="true">↗</span></Link>
+          <ThemeControl />
+        </div>
       </header>
 
       <div className="weather-body">
