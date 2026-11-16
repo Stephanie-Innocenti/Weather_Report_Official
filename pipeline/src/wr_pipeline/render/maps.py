@@ -7,9 +7,12 @@ matplotlib.use("Agg")
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap
 import numpy as np
 from PIL import Image
+
+from .labels import label_levels, lattice
 
 PC = ccrs.PlateCarree()
 
@@ -74,9 +77,42 @@ def render_map(field, var: dict, region: dict, meta: dict, vectors=None) -> byte
 
     if var["kind"] == "fill" and "lines" in var:
         lo, hi, st = var["lines"]
-        cl = ax.contour(lon, lat, field.values, levels=np.arange(lo, hi + st / 2, st),
-                        colors="#1b1b1b", linewidths=0.6, transform=PC, zorder=2)
-        ax.clabel(cl, fmt="%d", fontsize=7)
+        line_levels = np.arange(lo, hi + st / 2, st)
+        colors = [
+            "#c8262f" if var.get("zero_line") and np.isclose(level, 0) else "#1b1b1b"
+            for level in line_levels
+        ]
+        widths = [
+            1.25 if var.get("zero_line") and np.isclose(level, 0) else 0.6
+            for level in line_levels
+        ]
+        cl = ax.contour(
+            lon, lat, field.values, levels=line_levels, colors=colors, linewidths=widths,
+            transform=PC, zorder=2,
+        )
+        labels = ax.clabel(
+            cl, levels=label_levels(line_levels, var.get("label_lines_every")), fmt="%d", fontsize=7,
+        )
+        if var.get("label_halo"):
+            for label in labels:
+                label.set_path_effects(
+                    [path_effects.Stroke(linewidth=2.5, foreground="white"), path_effects.Normal()]
+                )
+
+    if "numbers" in var:
+        for row, col in lattice(lon, lat, east - west, int(var["numbers"]["cols"])):
+            if np.ma.is_masked(vals[row, col]):
+                continue
+            value = float(vals[row, col])
+            if not np.isfinite(value) or value < var.get("mask_below", -np.inf):
+                continue
+            label = ax.text(
+                lon[col], lat[row], f"{value:.0f}", transform=PC, ha="center", va="center",
+                color="#1b1b1b", fontsize=7, zorder=4,
+            )
+            label.set_path_effects(
+                [path_effects.Stroke(linewidth=2.5, foreground="white"), path_effects.Normal()]
+            )
 
     ax.add_feature(cfeature.COASTLINE.with_scale("50m"), linewidth=0.7, zorder=2)
     ax.add_feature(cfeature.BORDERS.with_scale("50m"), linewidth=0.5, linestyle=":", zorder=2)

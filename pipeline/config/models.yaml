@@ -33,6 +33,7 @@ gfs:
   params:                            # short = nome cfgrib per leggere il GRIB
     t2m: { param: "TMP", level: "2 m above ground", short: "2t" }
     mslp: { param: "PRMSL", level: "mean sea level", short: "prmsl" }
+    tp-acc: { param: "APCP", level: "surface", short: "tp", scale: 1, accum: true, skip_step0: true }   # kg/m2 = mm; accumulo continuo dal run
     z500: { param: "HGT", level: "500 mb", short: "gh" }
     z850: { param: "HGT", level: "850 mb", short: "gh" }
     t850: { param: "TMP", level: "850 mb", short: "t" }

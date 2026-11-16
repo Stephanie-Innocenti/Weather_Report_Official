@@ -2,6 +2,7 @@
 che servono, tramite il file .idx e richieste HTTP con Range. Dati di pubblico dominio."""
 import datetime as dt
 import logging
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,22 +28,42 @@ def _url(run: dt.datetime, step: int) -> str:
 
 
 @lru_cache(maxsize=512)
-def _idx(url: str) -> list[tuple[int, str, str]]:
-    """Righe del file .idx: (offset, variabile, livello)."""
+def _idx(url: str) -> list[tuple[int, str, str, str]]:
+    """Righe .idx: offset, variabile, livello e descrizione del periodo."""
     r = _session.get(url + ".idx", timeout=60)
     r.raise_for_status()
     rows = []
     for line in r.text.splitlines():
         p = line.split(":")
         if len(p) >= 5:
-            rows.append((int(p[1]), p[3], p[4]))
+            rows.append((int(p[1]), p[3], p[4], p[5] if len(p) > 5 else ""))
     return rows
 
 
-def _ranges(url: str, spec: dict) -> list[tuple[int, int | None]]:
+def _accumulation_hours(period: str) -> int | None:
+    match = re.fullmatch(r"0-(\d+)\s+(hour|day) acc fcst", period.strip())
+    if not match:
+        return None
+    amount = int(match.group(1))
+    return amount * (24 if match.group(2) == "day" else 1)
+
+
+def _ranges(url: str, spec: dict, step: int | None = None) -> list[tuple[int, int | None]]:
     rows = _idx(url)
+    if spec.get("accum"):
+        if step is None:
+            raise ValueError("step richiesto per selezionare un accumulo GFS")
+        for i, row in enumerate(rows):
+            offset, var, level = row[:3]
+            period = row[3] if len(row) > 3 else ""
+            if var == spec["param"] and level == spec["level"] and _accumulation_hours(period) == step:
+                end = rows[i + 1][0] - 1 if i + 1 < len(rows) else None
+                return [(offset, end)]
+        return []
+
     out = []
-    for i, (offset, var, level) in enumerate(rows):
+    for i, row in enumerate(rows):
+        offset, var, level = row[:3]
         if var == spec["param"] and level == spec["level"]:
             end = rows[i + 1][0] - 1 if i + 1 < len(rows) else None
             out.append((offset, end))
@@ -80,8 +101,10 @@ def download(cfg: dict, run: dt.datetime, spec: dict, steps: list[int], target: 
     try:
         with open(target, "wb") as out:
             for step in steps:
+                if spec.get("skip_step0") and step == 0:
+                    continue
                 url = _url(run, step)
-                ranges = _ranges(url, spec)
+                ranges = _ranges(url, spec, step if spec.get("accum") else None)
                 if not ranges:
                     raise RuntimeError(f"{spec['param']} {spec['level']} non trovato in {url}.idx")
                 for start, end in ranges:

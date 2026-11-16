@@ -23,12 +23,51 @@ const REGIONS: Record<RegionId, { label: string; view: [[number, number], [numbe
 const SAT_URL = "https://view.eumetsat.int/geoserver/wms";
 const SAT_LAYER = "mtg_fd:rgb_geocolour";
 
+function satelliteCacheKey() {
+  const now = new Date();
+  now.setUTCMinutes(Math.floor(now.getUTCMinutes() / 10) * 10, 0, 0);
+  return now.toISOString();
+}
+
+function satelliteParams(): import("leaflet").WMSParams & { _wr_refresh: string } {
+  return { layers: SAT_LAYER, _wr_refresh: satelliteCacheKey() };
+}
+
 // Copertura nevosa osservata da satellite (NASA GIBS MODIS Terra)
 const SNOW_URL = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi";
 const SNOW_LAYER = "MODIS_Terra_NDSI_Snow_Cover";
 
 // Radar nazionale Radar-DPC (Protezione Civile), licenza CC BY-SA 4.0
 const RADAR_URL = "https://radar-geowebcache.protezionecivile.it/service/wms";
+const RADAR_EU_API = "https://api.rainviewer.com/public/weather-maps.json";
+type RainViewerFrame = { path: string; time: number };
+type RainViewerMaps = { host: string; radar: { past: RainViewerFrame[] } };
+
+function isRainViewerMaps(payload: unknown): payload is RainViewerMaps {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("host" in payload) ||
+    typeof payload.host !== "string" ||
+    !("radar" in payload) ||
+    typeof payload.radar !== "object" ||
+    payload.radar === null ||
+    !("past" in payload.radar) ||
+    !Array.isArray(payload.radar.past)
+  ) {
+    return false;
+  }
+  return payload.radar.past.every((frame: unknown) =>
+    typeof frame === "object" &&
+    frame !== null &&
+    "path" in frame &&
+    typeof frame.path === "string" &&
+    frame.path.startsWith("/v2/radar/") &&
+    "time" in frame &&
+    typeof frame.time === "number",
+  );
+}
+
 const RADAR_PRODUCTS = [
   { id: "vmi", label: "Riflettività (VMI)" },
   { id: "sri", label: "Intensità di pioggia (SRI)" },
@@ -77,6 +116,7 @@ export default function LiveMap() {
   const [snow, setSnow] = useState(false);
   const [radar, setRadar] = useState(false);
   const [radarProduct, setRadarProduct] = useState("vmi");
+  const [radarError, setRadarError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(900);
@@ -140,37 +180,33 @@ export default function LiveMap() {
     map.setMaxBounds(b.pad(0.2));
   }, [ready, region]);
 
-  // satellite EUMETSAT: tile WMS in EPSG:3857, aggiornati ogni 10 minuti
+  // Il WMS sceglie l'ultimo frame disponibile; il parametro evita di riusare tile cache vecchie.
   useEffect(() => {
     const L = libRef.current;
     const map = mapRef.current;
     if (!ready || !L || !map || !sat) return;
+    const params = satelliteParams();
     const layer = L.tileLayer.wms(SAT_URL, {
-      layers: SAT_LAYER,
+      ...params,
       styles: "raster",
       format: "image/png",
       transparent: true,
       version: "1.1.1",
+      keepBuffer: 1,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
       pane: "sat",
       attribution: "© EUMETSAT",
     }).addTo(map);
     let retries = 0;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = (retry = false) => {
-      const now = new Date();
-      if (!retry) now.setUTCMinutes(Math.floor(now.getUTCMinutes() / 10) * 10, 0, 0);
-      const params: import("leaflet").WMSParams & { time: string } = {
-        layers: SAT_LAYER,
-        time: now.toISOString(),
-      };
-      layer.setParams(params);
-    };
+    const refresh = () => layer.setParams(satelliteParams());
     const retryFailedTiles = () => {
       if (retryTimer || retries >= 3) return;
       retries += 1;
       retryTimer = setTimeout(() => {
         retryTimer = undefined;
-        refresh(true);
+        layer.redraw();
       }, retries * 1000);
     };
     layer.on("tileerror", retryFailedTiles);
@@ -205,11 +241,11 @@ export default function LiveMap() {
     };
   }, [ready, snow]);
 
-  // Radar-DPC pubblica l'ultimo campione; cambia URL per evitare tile memorizzate nella cache.
+  // Radar-DPC copre l'Italia; conserva selezione prodotto e aggiornamento del servizio nazionale.
   useEffect(() => {
     const L = libRef.current;
     const map = mapRef.current;
-    if (!ready || !L || !map || !radar) return;
+    if (!ready || !L || !map || !radar || region !== "it") return;
     let layer: Removable | null = null;
     const make = () => {
       layer?.remove();
@@ -229,7 +265,56 @@ export default function LiveMap() {
       clearInterval(t);
       layer?.remove();
     };
-  }, [ready, radar, radarProduct]);
+  }, [ready, radar, radarProduct, region]);
+
+  // RainViewer fornisce un composito radar europeo gratuito per progetti di piccola scala.
+  useEffect(() => {
+    const L = libRef.current;
+    const map = mapRef.current;
+    if (!ready || !L || !map || !radar || region !== "eu") return;
+    let disposed = false;
+    let layer: Removable | null = null;
+    let framePath = "";
+    const refresh = async () => {
+      try {
+        const response = await fetch(RADAR_EU_API);
+        if (!response.ok) throw new Error(`Radar Europa non disponibile (HTTP ${response.status})`);
+        const payload: unknown = await response.json();
+        if (!isRainViewerMaps(payload)) throw new Error("Risposta non valida dal servizio radar europeo");
+        const latest = payload.radar.past[payload.radar.past.length - 1];
+        if (!latest) throw new Error("Nessuna immagine radar europea disponibile");
+        const tileBase = new URL(`${payload.host}${latest.path}`);
+        if (tileBase.protocol !== "https:" || tileBase.hostname !== "tilecache.rainviewer.com") {
+          throw new Error("Host non valido per il servizio radar europeo");
+        }
+        const nextFramePath = `${tileBase.origin}${tileBase.pathname}`;
+        if (disposed || nextFramePath === framePath) return;
+        const nextLayer = L.tileLayer(`${nextFramePath}/256/{z}/{x}/{y}/2/1_1.png`, {
+          pane: "radar",
+          opacity: 0.85,
+          maxNativeZoom: 7,
+          maxZoom: 18,
+          keepBuffer: 1,
+          updateWhenIdle: true,
+          attribution: '<a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar © RainViewer</a>',
+        }).addTo(map) as unknown as Removable;
+        layer?.remove();
+        layer = nextLayer;
+        framePath = nextFramePath;
+        setRadarError(null);
+      } catch (e) {
+        if (!disposed) setRadarError(e instanceof Error ? e.message : "Impossibile caricare il radar europeo");
+      }
+    };
+    setRadarError(null);
+    void refresh();
+    const timer = setInterval(() => void refresh(), 5 * 60 * 1000);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      layer?.remove();
+    };
+  }, [ready, radar, region]);
 
   useEffect(() => {
     let cancelled = false;
@@ -443,16 +528,29 @@ export default function LiveMap() {
             Neve osservata (NASA MODIS)
           </label>
           <label className="check">
-            <input type="checkbox" checked={radar} onChange={(e) => setRadar(e.target.checked)} />
-            Radar (Italia)
+            <input
+              type="checkbox"
+              checked={radar}
+              onChange={(e) => {
+                setRadar(e.target.checked);
+                setRadarError(null);
+              }}
+            />
+            Radar ({region === "it" ? "Italia" : "Europa"})
           </label>
-          {radar && (
+          {radar && region === "it" && (
             <select className="sub" value={radarProduct} onChange={(e) => setRadarProduct(e.target.value)} aria-label="Prodotto radar">
               {RADAR_PRODUCTS.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
               ))}
             </select>
           )}
+          {radar && region === "eu" && (
+            <a className="attr" href="https://www.rainviewer.com/" target="_blank" rel="noopener">
+              Dati radar © RainViewer
+            </a>
+          )}
+          {radarError && <p role="alert" className="attr">{radarError}</p>}
         </div>
       </section>
       <section className="live-panel bottom">{bottom}</section>
