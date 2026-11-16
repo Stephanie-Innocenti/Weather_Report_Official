@@ -123,9 +123,16 @@ def test_partial_then_complete_is_additive(monkeypatch, tmp_path):
     existing_manifest = _manifest(tmp_path)
     existing_manifest.pop("planned_countries")
     (tmp_path / "ecmwf-ifs/2026110400/manifest.json").write_text(json.dumps(existing_manifest))
+    latest = {
+        "updated": "2026-11-04T00:00:00Z",
+        "models": {"ecmwf-ifs": {"label": "ECMWF IFS", "run": "2026110312"}},
+    }
+    (tmp_path / naming.LATEST_KEY).write_text(json.dumps(latest))
     assert cli.main(base) == 0
     assert seen["calls"] == []
     assert _manifest(tmp_path)["planned_countries"]["al"] == "Albania"
+    latest = json.loads((tmp_path / naming.LATEST_KEY).read_text())
+    assert latest["models"]["ecmwf-ifs"]["run"] == "2026110400"
 
 
 def test_forced_partial_keeps_other_vars(monkeypatch, tmp_path):

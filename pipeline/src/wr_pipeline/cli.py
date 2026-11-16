@@ -123,6 +123,7 @@ def ingest(args) -> int:
                 mf.write_run_manifest(
                     store, args.model, m, rid, model_regions_cfg, vars_cfg, existing, list(old["regions"])
                 )
+            mf.update_latest(store, args.model, m["label"], rid)
             log.info("Run gia' completo, niente da fare (usa --force per rigenerare)")
             return 0
         if len(todo) < len(var_ids):

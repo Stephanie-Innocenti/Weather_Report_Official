@@ -29,18 +29,21 @@ def _clients(cfg: dict):
 
 
 def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
+    available: list[tuple[dt.datetime, str]] = []
     for name, client in _clients(cfg):
         try:
             run = client.latest(type="fc", stream=cfg["stream"], step=max_step, **_req(spec))
         except Exception as e:
             log.warning("latest() fallito con %s: %s", name, e)
             continue
-        # i run 06/18 non ci interessano: si scende al run 00/12 piu' recente
         hour = max(h for h in cfg["runs"] if h <= run.hour)
         run = run.replace(hour=hour, minute=0, second=0, microsecond=0)
-        log.info("Ultimo run utilizzabile: %s (sorgente %s)", run, name)
-        return run
-    raise RuntimeError("Nessuna sorgente ha risposto per il calcolo dell'ultimo run")
+        available.append((run, name))
+    if not available:
+        raise RuntimeError("Nessuna sorgente ha risposto per il calcolo dell'ultimo run")
+    run, name = max(available, key=lambda item: item[0])
+    log.info("Ultimo run utilizzabile: %s (sorgente %s)", run, name)
+    return run
 
 
 def download(cfg: dict, run: dt.datetime, spec: dict, steps: list[int], target: Path) -> Path:

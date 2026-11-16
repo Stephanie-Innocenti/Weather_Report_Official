@@ -56,6 +56,29 @@ def test_gfs_ranges(monkeypatch):
     assert g._ranges("u", {"param": "TMP", "level": "2 m above ground"}) == []
 
 
+def test_ecmwf_latest_run_uses_newest_source(monkeypatch):
+    from wr_pipeline.sources import ecmwf
+
+    runs = {
+        "google": dt.datetime(2026, 11, 15, 12),
+        "aws": dt.datetime(2026, 11, 16, 6),
+    }
+
+    class FakeClient:
+        def __init__(self, source):
+            self.source = source
+
+        def latest(self, **kwargs):
+            return runs[self.source]
+
+    monkeypatch.setattr(
+        ecmwf, "_clients", lambda cfg: [(name, FakeClient(name)) for name in ("google", "aws")]
+    )
+    cfg = {"runs": [0, 12], "stream": "oper"}
+
+    assert ecmwf.latest_run(cfg, 144, {"param": "2t"}) == dt.datetime(2026, 11, 16, 0)
+
+
 def test_open_param_reports_missing_grib_field(monkeypatch, tmp_path):
     monkeypatch.setattr(extract.xr, "open_dataset", lambda *args, **kwargs: extract.xr.Dataset())
 
