@@ -52,13 +52,18 @@ t850:
   scale: 1
   offset: -273.15
   kind: fill
-  stops: [[-30,"#3a0a5c"],[-22,"#5a2ca0"],[-14,"#2f55d4"],[-7,"#3f93f0"],[-0.1,"#a9ddf5"],[0.1,"#b8e8a6"],[6,"#79cf6c"],[12,"#f4e65a"],[18,"#f7a53b"],[24,"#e2432b"],[30,"#a1122a"]]
-  levels: [-30, 30, 3]               # fasce da 3 gradi
-  lines: [-30, 30, 3]                # isoterma sul bordo di ogni fascia
-  label_lines_every: 6               # numerate solo ogni 6 gradi (+ lo zero)
-  label_halo: true                   # alone bianco per leggere i numeri
-  zero_line: true                    # 0 C evidenziato
-  numbers: { cols: 11 }              # temperatura intera su un reticolo regolare, dentro le fasce
+  colors: ["#2b165f","#3c3b9f","#3f83d6","#9ed5e8","#a8d779","#f2df4e","#f49a38","#c72c31"]
+  levels: [-30, 30, 10]              # fasce ampie e leggibili
+  lines: [-30, 30, 6]                # poche isoterme principali
+  label_lines_every: 12              # poche etichette sulle isoterme
+  line_color: "#626a6e"
+  line_width: 0.4
+  zero_line_color: "#1f5fae"
+  zero_line_width: 0.75
+  line_label_fontsize: 5.5
+  label_halo_width: 0.8
+  label_halo: true
+  zero_line: true
   extend: both
 t500:
   label: "Temperatura a 500 hPa"
