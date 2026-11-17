@@ -36,11 +36,13 @@ def write_run_manifest(store, model_id, model_cfg, run, regions_cfg, vars_cfg, p
     store.put(run_manifest_key(model_id, run), json.dumps(manifest, ensure_ascii=False).encode(), JSON, RUN_CACHE)
 
 
-def update_latest(store, model_id: str, label: str, run: str) -> None:
+def update_latest(store, model_id: str, label: str, run: str, refresh: bool = False) -> None:
     raw = store.get(LATEST_KEY)
     data = json.loads(raw) if raw else {"models": {}}
     current = data["models"].get(model_id)
-    if current and current["run"] >= run:  # mai tornare indietro
+    if current and current["run"] > run:  # mai tornare indietro
+        return
+    if current and current["run"] == run and not refresh:
         return
     data["models"][model_id] = {"label": label, "run": run}
     data["updated"] = _now()

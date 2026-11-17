@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from wr_pipeline.render.labels import label_levels, lattice
+from wr_pipeline.render.labels import label_levels
 from wr_pipeline.sources import noaa_gfs as g
 
 
@@ -59,11 +59,3 @@ def test_label_levels():
     assert label_levels(lv, 6) == [v for v in lv if v % 6 == 0]
     assert label_levels(lv, 12) == [v for v in lv if v % 12 == 0]
     assert label_levels(lv, None) == list(lv)
-
-
-def test_lattice_is_regular_and_inside():
-    lon = np.arange(6, 19.01, 0.25)
-    lat = np.arange(35.5, 47.51, 0.25)
-    pts = lattice(lon, lat, 13, 11)
-    assert 60 < len(pts) < 160
-    assert all(0 < j < len(lat) - 1 and 0 < i < len(lon) - 1 for j, i in pts)

@@ -34,15 +34,15 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export const fetchLatest = () => getJson<Latest>("manifest/latest.json");
-export const fetchRun = (model: string, run: string) =>
-  getJson<RunManifest>(`${model}/${run}/manifest.json`);
+export const fetchRun = (model: string, run: string, version?: string) =>
+  getJson<RunManifest>(`${model}/${run}/manifest.json${version ? `?v=${encodeURIComponent(version)}` : ""}`);
 
 export function dataUrl(m: RunManifest, region: string, variable: string, step: number, ext: string): string {
   return `${DATA_URL}/${m.model}/${m.run}/${region}/${variable}/f${String(step).padStart(3, "0")}.${ext}`;
 }
 
 export const imageUrl = (m: RunManifest, region: string, variable: string, step: number) =>
-  dataUrl(m, region, variable, step, m.ext);
+  `${dataUrl(m, region, variable, step, m.ext)}?v=${encodeURIComponent(m.generated)}`;
 
 export async function fetchStepJson(m: RunManifest, region: string, variable: string, step: number): Promise<unknown> {
   const res = await fetch(dataUrl(m, region, variable, step, "json"));

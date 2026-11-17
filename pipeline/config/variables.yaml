@@ -52,13 +52,12 @@ t850:
   scale: 1
   offset: -273.15
   kind: fill
-  stops: [[-30,"#3a0a5c"],[-22,"#5a2ca0"],[-14,"#2f55d4"],[-7,"#3f93f0"],[-0.1,"#a9ddf5"],[0.1,"#b8e8a6"],[6,"#79cf6c"],[12,"#f4e65a"],[18,"#f7a53b"],[24,"#e2432b"],[30,"#a1122a"]]
-  levels: [-30, 30, 3]               # fasce da 3 gradi
-  lines: [-30, 30, 3]                # isoterma sul bordo di ogni fascia
-  label_lines_every: 6               # numerate solo ogni 6 gradi (+ lo zero)
-  label_halo: true                   # alone bianco per leggere i numeri
-  zero_line: true                    # 0 C evidenziato
-  numbers: { cols: 11 }              # temperatura intera su un reticolo regolare, dentro le fasce
+  stops: [[-54,"#dddddd"],[-51,"#b0b0b0"],[-48,"#906090"],[-45,"#604060"],[-42,"#400040"],[-39,"#600060"],[-36,"#aa00aa"],[-33,"#801080"],[-30,"#600040"],[-27,"#303366"],[-24,"#003399"],[-21,"#0000cc"],[-18,"#0000ff"],[-15,"#0055ff"],[-12,"#0099ff"],[-9,"#33ccff"],[-6,"#66ffff"],[-3,"#66ff99"],[0,"#66ff66"],[3,"#66ff00"],[6,"#bffa0e"],[9,"#ffff09"],[12,"#ffff86"],[15,"#fde851"],[18,"#ffcc00"],[21,"#ff9900"],[24,"#ff6900"],[27,"#ff4d33"],[30,"#ff3000"],[33,"#ff0000"],[36,"#cc0000"],[39,"#990000"],[42,"#6c0000"],[45,"#4f0000"],[48,"#000000"],[51,"#000000"],[54,"#000000"]]
+  levels: [-54, 54, 3]               # fasce da 3 gradi
+  lines: [-54, 54, 2]                # isoterme ogni 2 gradi
+  label_lines_every: 4               # numeri ogni 4 gradi
+  label_halo: true
+  colorbar_tick_step: 1
   extend: both
 t500:
   label: "Temperatura a 500 hPa"

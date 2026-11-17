@@ -12,7 +12,7 @@ from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColor
 import numpy as np
 from PIL import Image
 
-from .labels import label_levels, lattice
+from .labels import label_levels
 
 PC = ccrs.PlateCarree()
 
@@ -99,21 +99,6 @@ def render_map(field, var: dict, region: dict, meta: dict, vectors=None) -> byte
                     [path_effects.Stroke(linewidth=2.5, foreground="white"), path_effects.Normal()]
                 )
 
-    if "numbers" in var:
-        for row, col in lattice(lon, lat, east - west, int(var["numbers"]["cols"])):
-            if np.ma.is_masked(vals[row, col]):
-                continue
-            value = float(vals[row, col])
-            if not np.isfinite(value) or value < var.get("mask_below", -np.inf):
-                continue
-            label = ax.text(
-                lon[col], lat[row], f"{value:.0f}", transform=PC, ha="center", va="center",
-                color="#1b1b1b", fontsize=7, zorder=4,
-            )
-            label.set_path_effects(
-                [path_effects.Stroke(linewidth=2.5, foreground="white"), path_effects.Normal()]
-            )
-
     ax.add_feature(cfeature.COASTLINE.with_scale("50m"), linewidth=0.7, zorder=2)
     ax.add_feature(cfeature.BORDERS.with_scale("50m"), linewidth=0.5, linestyle=":", zorder=2)
 
@@ -121,7 +106,8 @@ def render_map(field, var: dict, region: dict, meta: dict, vectors=None) -> byte
         cb = fig.colorbar(mappable, ax=ax, orientation="horizontal", pad=0.05, shrink=0.85, aspect=45)
         cb.set_label(f"{var['label']} ({var['unit']})", fontsize=8)
         cb.ax.tick_params(labelsize=7)
-        cb.set_ticks(levels[:: max(1, len(levels) // 12)])
+        tick_step = var.get("colorbar_tick_step", max(1, len(levels) // 12))
+        cb.set_ticks(levels[::tick_step])
 
     title = f"{meta['model_label']}  |  {var['label']} ({var['unit']})"
     sub = f"Run {meta['run']:%d/%m/%Y %H} UTC   +{meta['step']:03d}h   valido {meta['valid']:%a %d/%m/%Y %H} UTC"

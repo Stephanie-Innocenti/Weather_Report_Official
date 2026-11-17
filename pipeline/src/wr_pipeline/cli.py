@@ -11,7 +11,7 @@ from .publish import manifest as mf
 from .publish.storage import get_store
 
 log = logging.getLogger("wr")
-IMG_CACHE = "public, max-age=31536000, immutable"  # il run e' nel path: non cambia mai
+IMG_CACHE = "public, max-age=300"
 
 SOURCES = {
     "ecmwf_opendata": "wr_pipeline.sources.ecmwf",
@@ -158,7 +158,7 @@ def ingest(args) -> int:
     merged = {v: merged[v] for v in m["params"] if v in merged}  # ordine come in models.yaml
     regions_all = [r for r in regions_cfg if r in set(old["regions"]) | set(regions)]
     mf.write_run_manifest(store, args.model, m, rid, model_regions_cfg, vars_cfg, merged, regions_all)
-    mf.update_latest(store, args.model, m["label"], rid)
+    mf.update_latest(store, args.model, m["label"], rid, refresh=True)
     removed = mf.cleanup(store, args.model, keep=2)
     log.info("Fatto. Run rimossi: %s", removed or "nessuno")
     return 0

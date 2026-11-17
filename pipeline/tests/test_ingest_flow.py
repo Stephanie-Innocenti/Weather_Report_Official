@@ -7,6 +7,8 @@ import types
 import pandas as pd
 
 from wr_pipeline import cli, config, naming
+from wr_pipeline.publish import manifest as mf
+from wr_pipeline.publish.storage import LocalStore
 from wr_pipeline.sources import noaa_gfs
 
 
@@ -142,3 +144,24 @@ def test_forced_partial_keeps_other_vars(monkeypatch, tmp_path):
     assert cli.main(base + ["--vars", "t850", "--force"]) == 0
     assert len(_manifest(tmp_path)["vars"]) == 9  # le altre non spariscono
     assert (tmp_path / naming.image_key("ecmwf-ifs", "2026110400", "it", "t2m", 0)).exists()
+
+
+def test_update_latest_refreshes_same_run_after_forced_ingest(tmp_path):
+    store = LocalStore(str(tmp_path))
+    store.put(
+        naming.LATEST_KEY,
+        json.dumps({
+            "updated": "2026-11-04T00:00:00Z",
+            "models": {"gfs": {"label": "GFS", "run": "2026110400"}},
+        }).encode(),
+        "application/json",
+        "public, max-age=60",
+    )
+
+    mf.update_latest(store, "gfs", "GFS", "2026110400")
+    assert json.loads(store.get(naming.LATEST_KEY))["updated"] == "2026-11-04T00:00:00Z"
+
+    mf.update_latest(store, "gfs", "GFS", "2026110400", refresh=True)
+    latest = json.loads(store.get(naming.LATEST_KEY))
+    assert latest["updated"] != "2026-11-04T00:00:00Z"
+    assert latest["models"]["gfs"]["run"] == "2026110400"

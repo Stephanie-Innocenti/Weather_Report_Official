@@ -66,7 +66,7 @@ export default function Viewer() {
   useEffect(() => {
     if (!selectedRun || !model) return;
     let cancelled = false;
-    fetchRun(model, selectedRun)
+    fetchRun(model, selectedRun, latest?.updated)
       .then((r) => {
         if (cancelled) return;
         setRun(r);
@@ -80,7 +80,7 @@ export default function Viewer() {
     return () => {
       cancelled = true;
     };
-  }, [model, selectedRun]);
+  }, [model, selectedRun, latest?.updated]);
 
   const steps = useMemo(() => run?.vars[variable]?.steps ?? [], [run, variable]);
   const i = Math.min(idx, Math.max(steps.length - 1, 0));

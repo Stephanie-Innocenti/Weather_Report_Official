@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from wr_pipeline import config
 from wr_pipeline.process.wind import wind_json
 
 
@@ -66,3 +67,14 @@ def test_style_wrong_color_count():
     except ValueError:
         return
     raise AssertionError("doveva fallire")
+
+
+def test_t850_style_uses_three_degree_bands_and_two_degree_isotherms():
+    var = config.load("variables")["t850"]
+    levels = np.arange(var["levels"][0], var["levels"][1] + var["levels"][2] / 2, var["levels"][2])
+
+    assert var["levels"] == [-54, 54, 3]
+    assert var["lines"] == [-54, 54, 2]
+    assert len(var["stops"]) == 37
+    assert var["colorbar_tick_step"] == 1
+    _load_style()(var, levels)
