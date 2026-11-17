@@ -52,18 +52,10 @@ t850:
   scale: 1
   offset: -273.15
   kind: fill
-  colors: ["#2b165f","#3c3b9f","#3f83d6","#9ed5e8","#a8d779","#f2df4e","#f49a38","#c72c31"]
-  levels: [-30, 30, 10]              # fasce ampie e leggibili
-  lines: [-30, 30, 6]                # poche isoterme principali
-  label_lines_every: 12              # poche etichette sulle isoterme
-  line_color: "#626a6e"
-  line_width: 0.4
-  zero_line_color: "#1f5fae"
-  zero_line_width: 0.75
-  line_label_fontsize: 5.5
-  label_halo_width: 0.8
-  label_halo: true
-  zero_line: true
+  cmap: Spectral_r
+  levels: [-30, 30, 3]               # fasce da 3 gradi
+  lines: [-30, 30, 2]                # isoterme ogni 2 gradi
+  label_lines_every: 6
   extend: both
 t500:
   label: "Temperatura a 500 hPa"
