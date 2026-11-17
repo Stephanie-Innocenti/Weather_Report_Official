@@ -52,10 +52,13 @@ t850:
   scale: 1
   offset: -273.15
   kind: fill
-  cmap: Spectral_r
+  stops: [[-30,"#3a0a5c"],[-22,"#5a2ca0"],[-14,"#2f55d4"],[-7,"#3f93f0"],[-0.1,"#a9ddf5"],[0.1,"#b8e8a6"],[6,"#79cf6c"],[12,"#f4e65a"],[18,"#f7a53b"],[24,"#e2432b"],[30,"#a1122a"]]
   levels: [-30, 30, 3]               # fasce da 3 gradi
-  lines: [-30, 30, 2]                # isoterme ogni 2 gradi
-  label_lines_every: 6
+  lines: [-30, 30, 3]                # isoterma sul bordo di ogni fascia
+  label_lines_every: 6               # numerate solo ogni 6 gradi (+ lo zero)
+  label_halo: true                   # alone bianco per leggere i numeri
+  zero_line: true                    # 0 C evidenziato
+  numbers: { cols: 11 }              # temperatura intera su un reticolo regolare, dentro le fasce
   extend: both
 t500:
   label: "Temperatura a 500 hPa"
