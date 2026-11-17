@@ -61,12 +61,15 @@ export default function Viewer() {
     };
   }, []);
 
-  const selectedRun = latest?.models[model]?.run;
+  const runRefreshKey = `${latest?.models[model]?.run ?? ""}|${latest?.updated ?? ""}`;
 
   useEffect(() => {
+    const separator = runRefreshKey.indexOf("|");
+    const selectedRun = runRefreshKey.slice(0, separator);
+    const version = runRefreshKey.slice(separator + 1);
     if (!selectedRun || !model) return;
     let cancelled = false;
-    fetchRun(model, selectedRun, latest?.updated)
+    fetchRun(model, selectedRun, version)
       .then((r) => {
         if (cancelled) return;
         setRun(r);
@@ -80,7 +83,7 @@ export default function Viewer() {
     return () => {
       cancelled = true;
     };
-  }, [model, selectedRun, latest?.updated]);
+  }, [model, runRefreshKey]);
 
   const steps = useMemo(() => run?.vars[variable]?.steps ?? [], [run, variable]);
   const i = Math.min(idx, Math.max(steps.length - 1, 0));

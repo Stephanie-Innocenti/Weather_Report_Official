@@ -21,7 +21,7 @@
   color-scheme: light dark;
 }
 
-:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="light"] { color-scheme: only light; }
 :root[data-theme="dark"] {
   --paper: #121714;
   --panel: #1b231f;
