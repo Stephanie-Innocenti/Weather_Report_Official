@@ -11,6 +11,7 @@ def test_idx_keeps_forecast_period(monkeypatch):
         g._session,
         "get",
         lambda url, timeout: SimpleNamespace(
+            status_code=200,
             text="1:100:d=2026111600:APCP:surface:0-3 hour acc fcst:\n",
             raise_for_status=lambda: None,
         ),
@@ -18,6 +19,27 @@ def test_idx_keeps_forecast_period(monkeypatch):
     assert g._idx("https://example.test/gfs") == [
         (100, "APCP", "surface", "0-3 hour acc fcst")
     ]
+
+
+def test_idx_retries_temporary_404(monkeypatch):
+    g._idx.cache_clear()
+    responses = iter([
+        SimpleNamespace(status_code=404),
+        SimpleNamespace(
+            status_code=200,
+            text="1:100:d=2026111600:APCP:surface:0-3 hour acc fcst:\n",
+            raise_for_status=lambda: None,
+        ),
+    ])
+    delays = []
+    monkeypatch.setattr(g._session, "get", lambda url, timeout: next(responses))
+    monkeypatch.setattr(g.time, "sleep", delays.append)
+
+    assert g._idx("https://example.test/retry") == [
+        (100, "APCP", "surface", "0-3 hour acc fcst")
+    ]
+    assert delays == [g.INDEX_RETRY_BASE_SECONDS]
+    g._idx.cache_clear()
 
 
 def _rows():

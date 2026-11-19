@@ -2,8 +2,8 @@ name: ingest-gfs
 
 on:
   schedule:
-    # Due controlli per finestra: recupera anche se il primo evento viene ritardato o perso.
-    - cron: "20,40 4-6,10-12,16-18,22,23,0 * * *"
+    # Avvia i controlli da +5 ore dal run, quando gli indici GFS sono piu' stabili.
+    - cron: "20,40 5-7,11-13,17-19,23,0,1 * * *"
   workflow_dispatch:
     inputs:
       run:
@@ -12,10 +12,10 @@ on:
       force:
         description: "Rigenera anche se esiste"
         type: boolean
-        default: true
+        default: false
       vars:
-        description: "Variabili da rigenerare (predefinito: t850; vuoto = tutte)"
-        default: "t850"
+        description: "Variabili da rigenerare (vuoto = tutte; es. t850)"
+        default: ""
       steps_max:
         description: "Limita gli step per un test veloce, es. 12 (vuoto = tutti)"
         default: ""

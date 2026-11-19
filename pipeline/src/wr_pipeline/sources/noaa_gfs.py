@@ -3,6 +3,7 @@ che servono, tramite il file .idx e richieste HTTP con Range. Dati di pubblico d
 import datetime as dt
 import logging
 import re
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from urllib3.util.retry import Retry
 log = logging.getLogger("wr")
 
 BASE = "https://noaa-gfs-bdp-pds.s3.amazonaws.com"
+INDEX_404_RETRIES = 3
+INDEX_RETRY_BASE_SECONDS = 5
 
 _session = requests.Session()
 _session.mount(
@@ -30,7 +33,14 @@ def _url(run: dt.datetime, step: int) -> str:
 @lru_cache(maxsize=512)
 def _idx(url: str) -> list[tuple[int, str, str, str]]:
     """Righe .idx: offset, variabile, livello e descrizione del periodo."""
-    r = _session.get(url + ".idx", timeout=60)
+    index_url = url + ".idx"
+    for attempt in range(INDEX_404_RETRIES + 1):
+        r = _session.get(index_url, timeout=60)
+        if r.status_code != 404 or attempt == INDEX_404_RETRIES:
+            break
+        delay = INDEX_RETRY_BASE_SECONDS * (2**attempt)
+        log.warning("Indice GFS non ancora pubblicato (%s); nuovo tentativo tra %d s", index_url, delay)
+        time.sleep(delay)
     r.raise_for_status()
     rows = []
     for line in r.text.splitlines():
