@@ -5,6 +5,7 @@ import "leaflet-velocity/dist/leaflet-velocity.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import LanguageControl, { useLanguage } from "@/components/LanguageControl";
 import type { Map as LeafletMap } from "leaflet";
 import { fetchLatest, fetchRun, fetchStepJson, runStart, type Latest, type RunManifest } from "@/lib/data";
 
@@ -14,9 +15,9 @@ type Removable = { remove: () => unknown };
 type RegionId = "eu" | "it";
 
 // Vista bloccata sulla regione (come una carta meteo): zoom minimo = inquadratura, massimo = +3
-const REGIONS: Record<RegionId, { label: string; view: [[number, number], [number, number]] }> = {
-  eu: { label: "Europa", view: [[33, -13], [61, 37]] },
-  it: { label: "Italia", view: [[35.2, 6.2], [47.3, 19.0]] },
+const REGIONS: Record<RegionId, { view: [[number, number], [number, number]] }> = {
+  eu: { view: [[33, -13], [61, 37]] },
+  it: { view: [[35.2, 6.2], [47.3, 19.0]] },
 };
 
 // Satellite EUMETSAT in tile WMS: mantiene la proiezione corretta e non crea una singola immagine stirata
@@ -69,8 +70,8 @@ function isRainViewerMaps(payload: unknown): payload is RainViewerMaps {
 }
 
 const RADAR_PRODUCTS = [
-  { id: "vmi", label: "Riflettività (VMI)" },
-  { id: "sri", label: "Intensità di pioggia (SRI)" },
+  { id: "vmi", labelKey: "map.radarReflectivity" },
+  { id: "sri", labelKey: "map.rainIntensity" },
 ];
 
 const WIND_COLORS = ["#a8dcf5", "#79cf6c", "#f4e65a", "#f7a53b", "#e2432b", "#c0267a", "#8c2d8f"];
@@ -101,6 +102,7 @@ async function addBasemap(L: LeafletLib, map: LeafletMap) {
 }
 
 export default function LiveMap() {
+  const { t, dateLocale } = useLanguage();
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<VelocityLayer | null>(null);
@@ -278,14 +280,16 @@ export default function LiveMap() {
     const refresh = async () => {
       try {
         const response = await fetch(RADAR_EU_API);
-        if (!response.ok) throw new Error(`Radar Europa non disponibile (HTTP ${response.status})`);
+        if (!response.ok) {
+          throw new Error(t("map.radarHttpError").replace("{status}", String(response.status)));
+        }
         const payload: unknown = await response.json();
-        if (!isRainViewerMaps(payload)) throw new Error("Risposta non valida dal servizio radar europeo");
+        if (!isRainViewerMaps(payload)) throw new Error(t("map.invalidRadar"));
         const latest = payload.radar.past[payload.radar.past.length - 1];
-        if (!latest) throw new Error("Nessuna immagine radar europea disponibile");
+        if (!latest) throw new Error(t("map.noRadarFrames"));
         const tileBase = new URL(`${payload.host}${latest.path}`);
         if (tileBase.protocol !== "https:" || tileBase.hostname !== "tilecache.rainviewer.com") {
-          throw new Error("Host non valido per il servizio radar europeo");
+          throw new Error(t("map.invalidRadarHost"));
         }
         const nextFramePath = `${tileBase.origin}${tileBase.pathname}`;
         if (disposed || nextFramePath === framePath) return;
@@ -303,7 +307,7 @@ export default function LiveMap() {
         framePath = nextFramePath;
         setRadarError(null);
       } catch (e) {
-        if (!disposed) setRadarError(e instanceof Error ? e.message : "Impossibile caricare il radar europeo");
+        if (!disposed) setRadarError(e instanceof Error ? e.message : t("map.unavailableRadar"));
       }
     };
     setRadarError(null);
@@ -314,7 +318,7 @@ export default function LiveMap() {
       clearInterval(timer);
       layer?.remove();
     };
-  }, [ready, radar, region]);
+  }, [ready, radar, region, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -395,9 +399,9 @@ export default function LiveMap() {
           layerRef.current = L.velocityLayer({
             displayValues: true,
             displayOptions: {
-              velocityType: "Vento",
+              velocityType: t("map.wind"),
               position: "topright",
-              emptyString: "Nessun dato",
+              emptyString: t("map.noData"),
               angleConvention: "bearingCW",
               speedUnit: "k/h",
             },
@@ -421,7 +425,7 @@ export default function LiveMap() {
     return () => {
       cancelled = true;
     };
-  }, [ready, run, windVar, windRegion, step, steps, i]);
+  }, [ready, run, windVar, windRegion, step, steps, i, t]);
 
   useEffect(() => {
     if (!playing || steps.length < 2) return;
@@ -437,24 +441,27 @@ export default function LiveMap() {
 
   let bottom: React.ReactNode;
   if (error) {
-    bottom = <p role="alert"><strong>Dati non disponibili.</strong> {error}</p>;
+    bottom = <p role="alert"><strong>{t("common.dataUnavailable")}</strong> {error}</p>;
   } else if (!run) {
-    bottom = <p>Caricamento dei dati…</p>;
+    bottom = <p>{t("common.loading")}</p>;
   } else if (!windVar) {
-    bottom = <p>Questo modello non ha ancora dati di vento per la mappa live: lancia la pipeline e riprova.</p>;
+    bottom = <p>{t("map.noWind")}</p>;
   } else {
     bottom = (
       <>
         <header className="readout">
-          <p className="when">{valid ? `${valid.toLocaleString("it-IT", whenFmt)} UTC` : "—"}</p>
+          <p className="when">{valid ? `${valid.toLocaleString(dateLocale, whenFmt)} UTC` : "—"}</p>
           <p className="meta">
-            Previsione {run.label}, +{step ?? 0} ore {loading ? "(caricamento…)" : ""}
+            {t("map.forecast")
+              .replace("{model}", run.label)
+              .replace("{step}", String(step ?? 0))
+              .replace("{loading}", loading ? t("map.loading") : "")}
           </p>
         </header>
         <div className="player">
-          <button onClick={() => setIdx((n) => Math.max(n - 1, 0))} aria-label="Step precedente" disabled={i === 0}>‹</button>
-          <button className="play" onClick={() => setPlaying((p) => !p)}>{playing ? "Pausa" : "Riproduci"}</button>
-          <button onClick={() => setIdx((n) => Math.min(n + 1, steps.length - 1))} aria-label="Step successivo" disabled={i >= steps.length - 1}>›</button>
+          <button onClick={() => setIdx((n) => Math.max(n - 1, 0))} aria-label={t("home.previousStep")} disabled={i === 0}>‹</button>
+          <button className="play" onClick={() => setPlaying((p) => !p)}>{playing ? t("home.pause") : t("home.play")}</button>
+          <button onClick={() => setIdx((n) => Math.min(n + 1, steps.length - 1))} aria-label={t("home.nextStep")} disabled={i >= steps.length - 1}>›</button>
           <input
             type="range"
             min={0}
@@ -464,16 +471,16 @@ export default function LiveMap() {
               setPlaying(false);
               setIdx(Number(e.target.value));
             }}
-            aria-label="Ora di previsione"
+            aria-label={t("home.forecastTime")}
           />
-          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Velocità animazione">
-            <option value={1500}>Lenta</option>
-            <option value={900}>Normale</option>
-            <option value={450}>Veloce</option>
+          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label={t("home.animationSpeed")}>
+            <option value={1500}>{t("home.slow")}</option>
+            <option value={900}>{t("home.normal")}</option>
+            <option value={450}>{t("home.fast")}</option>
           </select>
         </div>
         <p className="attr">
-          {run.attribution}. Il cursore anima il vento previsto; il radar mostra l’ultimo dato disponibile.
+          {run.attribution}. {t("map.windAttribution")}
         </p>
       </>
     );
@@ -484,22 +491,25 @@ export default function LiveMap() {
       <div ref={mapEl} className="live-map" />
       <section className="live-panel top">
         <h1 className="brand">
-          Weather Report <span>Mappa live</span>
+          Weather Report <span>{t("map.title")}</span>
         </h1>
-        <Link className="navlink" href="/">← Carte dei modelli</Link>
+        <div className="live-language-row">
+          <Link className="navlink" href="/">{t("map.back")}</Link>
+          <LanguageControl variant="panel" />
+        </div>
 
-        <div className="group" role="radiogroup" aria-label="Area">
-          <p className="group-label">Area</p>
+        <div className="group" role="radiogroup" aria-label={t("map.area")}>
+          <p className="group-label">{t("map.area")}</p>
           {(Object.keys(REGIONS) as RegionId[]).map((id) => (
             <button key={id} role="radio" aria-checked={id === region} className={id === region ? "choice on" : "choice"} onClick={() => setRegion(id)}>
-              {REGIONS[id].label}
+              {t(`region.${id}`)}
             </button>
           ))}
         </div>
 
         {latest && (
-          <div className="group" role="radiogroup" aria-label="Modello">
-            <p className="group-label">Modello del vento</p>
+          <div className="group" role="radiogroup" aria-label={t("map.windModel")}>
+            <p className="group-label">{t("map.windModel")}</p>
             {Object.entries(latest.models).map(([id, m]) => (
               <button
                 key={id}
@@ -518,14 +528,14 @@ export default function LiveMap() {
         )}
 
         <div className="group">
-          <p className="group-label">Livelli</p>
+          <p className="group-label">{t("map.levels")}</p>
           <label className="check">
             <input type="checkbox" checked={sat} onChange={(e) => setSat(e.target.checked)} />
-            Satellite (EUMETSAT)
+            {t("map.satellite")}
           </label>
           <label className="check">
             <input type="checkbox" checked={snow} onChange={(e) => setSnow(e.target.checked)} />
-            Neve osservata (NASA MODIS)
+            {t("map.snow")}
           </label>
           <label className="check">
             <input
@@ -536,18 +546,18 @@ export default function LiveMap() {
                 setRadarError(null);
               }}
             />
-            Radar ({region === "it" ? "Italia" : "Europa"})
+            {t("map.radar").replace("{area}", t(`region.${region}`))}
           </label>
           {radar && region === "it" && (
-            <select className="sub" value={radarProduct} onChange={(e) => setRadarProduct(e.target.value)} aria-label="Prodotto radar">
+            <select className="sub" value={radarProduct} onChange={(e) => setRadarProduct(e.target.value)} aria-label={t("map.radarProduct")}>
               {RADAR_PRODUCTS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
+                <option key={p.id} value={p.id}>{t(p.labelKey)}</option>
               ))}
             </select>
           )}
           {radar && region === "eu" && (
             <a className="attr" href="https://www.rainviewer.com/" target="_blank" rel="noopener">
-              Dati radar © RainViewer
+              {t("map.radarAttribution")}
             </a>
           )}
           {radarError && <p role="alert" className="attr">{radarError}</p>}

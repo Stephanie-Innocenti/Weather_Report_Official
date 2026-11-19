@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import LanguageControl, { useLanguage } from "@/components/LanguageControl";
 import StepPicker from "@/components/StepPicker";
 import ThemeControl from "@/components/ThemeControl";
 import { fetchLatest, fetchRun, imageUrl, runStart, type Latest, type RunManifest } from "@/lib/data";
@@ -29,6 +30,7 @@ function Choice(props: { label: string; value: string; options: Option[]; onChan
 }
 
 export default function Viewer() {
+  const { t, dateLocale, localizedLabel, countryName } = useLanguage();
   const [latest, setLatest] = useState<Latest | null>(null);
   const [model, setModel] = useState("");
   const [run, setRun] = useState<RunManifest | null>(null);
@@ -123,12 +125,12 @@ export default function Viewer() {
   if (error) {
     return (
       <div className="notice" role="alert">
-        <strong>Dati non disponibili.</strong> {error}
+        <strong>{t("common.dataUnavailable")}</strong> {error}
       </div>
     );
   }
-  if (!latest || !run) return <div className="notice">Caricamento dei dati…</div>;
-  if (!model) return <div className="notice">Nessun run pubblicato: lancia la pipeline e riprova.</div>;
+  if (!latest || !run) return <div className="notice">{t("common.loading")}</div>;
+  if (!model) return <div className="notice">{t("home.noRun")}</div>;
 
   const start = runStart(run.run);
   const valid = step !== undefined ? new Date(start.getTime() + step * 3_600_000) : null;
@@ -137,33 +139,44 @@ export default function Viewer() {
   };
   const runFmt: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", hour: "2-digit", timeZone: "UTC" };
   const v = run.vars[variable];
-  const variableOptions: Option[] = Object.entries(run.vars).map(([id, info]) => ({ id, text: info.label }));
-  for (const [id, label] of [
+  const variableOptions: Option[] = Object.entries(run.vars).map(([id, info]) => ({
+    id,
+    text: localizedLabel(`var.${id}`, info.label),
+  }));
+  for (const [id, fallback] of [
     ["snow-depth", "Neve accumulata al suolo"],
     ["t500", "Temperatura a 500 hPa"],
   ]) {
-    if (!run.vars[id]) variableOptions.push({ id, text: `${label} · in attesa dei dati`, disabled: true });
+    if (!run.vars[id]) {
+      const label = localizedLabel(`var.${id}`, fallback);
+      variableOptions.push({
+        id,
+        text: t("common.awaitingData").replace("{label}", label),
+        disabled: true,
+      });
+    }
   }
 
   return (
     <div className="weather-shell">
       <header className="season-banner">
         <div className="season-copy">
-          <p className="season-kicker">Previsioni · modelli numerici</p>
+          <p className="season-kicker">{t("home.kicker")}</p>
           <h1>Weather Report</h1>
-          <p>Leggi il tempo che arriva, un run alla volta.</p>
+          <p>{t("home.tagline")}</p>
         </div>
         <div className="season-actions">
-          <Link className="season-link" href="/live">Apri la mappa live <span aria-hidden="true">↗</span></Link>
+          <Link className="season-link" href="/live">{t("home.openLive")} <span aria-hidden="true">↗</span></Link>
+          <LanguageControl />
           <ThemeControl />
         </div>
       </header>
 
       <div className="weather-body">
-        <aside className="rail" aria-label="Selezione previsione">
+      <aside className="rail" aria-label={t("home.forecastSelection")}>
           <section className="control-card">
             <Choice
-              label="Modello"
+            label={t("home.model")}
               value={model}
               options={Object.entries(latest.models).map(([id, m]) => ({ id, text: m.label }))}
               onChange={(nextModel) => {
@@ -174,7 +187,7 @@ export default function Viewer() {
           </section>
           <section className="control-card">
             <Choice
-              label="Parametro"
+              label={t("home.parameter")}
               value={variable}
               options={variableOptions}
               onChange={(nextVariable) => {
@@ -185,9 +198,12 @@ export default function Viewer() {
           </section>
           <section className="control-card">
             <Choice
-              label="Area"
+              label={t("home.area")}
               value={region}
-              options={Object.entries(run.regions).map(([id, r]) => ({ id, text: r.label }))}
+              options={Object.entries(run.regions).map(([id, r]) => ({
+                id,
+                text: localizedLabel(`region.${id}`, r.label),
+              }))}
               onChange={setRegion}
             />
             <button
@@ -197,30 +213,32 @@ export default function Viewer() {
               aria-controls="planned-countries"
               onClick={() => setShowPlannedCountries((visible) => !visible)}
             >
-              Altri Paesi europei <span aria-hidden="true">{showPlannedCountries ? "−" : "+"}</span>
+              {t("home.otherCountries")} <span aria-hidden="true">{showPlannedCountries ? "−" : "+"}</span>
             </button>
             {showPlannedCountries && (
               <div id="planned-countries" className="planned-countries">
-                <p className="planned-countries-note">Mappe non ancora pubblicate.</p>
+                <p className="planned-countries-note">{t("home.mapsPending")}</p>
                 {Object.entries(run.planned_countries ?? {}).map(([id, label]) => (
                   <button key={id} type="button" className="choice unavailable" disabled>
-                    {label}
+                    {countryName(id, label)}
                   </button>
                 ))}
               </div>
             )}
           </section>
-          <p className="sidebar-note">Nuove mappe e parametri si attivano quando il run è pubblicato.</p>
+          <p className="sidebar-note">{t("home.sidebarNote")}</p>
         </aside>
 
         <main className="stage">
           <section className="forecast-card">
             <header className="forecast-head">
               <div>
-                <p className="forecast-kicker">{run.label} <span>·</span> {run.regions[region]?.label}</p>
-                <h2 className="when">{valid ? `${valid.toLocaleString("it-IT", whenFmt)} UTC` : "—"}</h2>
+                <p className="forecast-kicker">
+                  {run.label} <span>·</span> {localizedLabel(`region.${region}`, run.regions[region]?.label ?? region)}
+                </p>
+                <h2 className="when">{valid ? `${valid.toLocaleString(dateLocale, whenFmt)} UTC` : "—"}</h2>
                 <p className="meta">
-                  Run delle {start.toLocaleString("it-IT", runFmt)} UTC · previsione a +{step ?? 0} ore
+                  Run {start.toLocaleString(dateLocale, runFmt)} UTC · {t("home.forecastAt").replace("{step}", String(step ?? 0))}
                 </p>
               </div>
             </header>
@@ -229,7 +247,13 @@ export default function Viewer() {
               <div className="frame">
                 {step !== undefined && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imageUrl(run, region, variable, step)} alt={`${v?.label}, ${run.regions[region]?.label}, +${step} ore`} />
+                  <img
+                    src={imageUrl(run, region, variable, step)}
+                    alt={t("home.imageAlt")
+                      .replace("{variable}", localizedLabel(`var.${variable}`, v?.label ?? variable))
+                      .replace("{area}", localizedLabel(`region.${region}`, run.regions[region]?.label ?? region))
+                      .replace("{step}", String(step))}
+                  />
                 )}
               </div>
               <StepPicker
@@ -243,20 +267,20 @@ export default function Viewer() {
             </div>
 
             <div className="frame-caption">
-              <strong>{v?.label}</strong>
+              <strong>{localizedLabel(`var.${variable}`, v?.label ?? variable)}</strong>
               <span>{v?.unit} <span aria-hidden="true">·</span> {run.attribution}</span>
             </div>
           </section>
 
-          <section className="player-card" aria-label="Controlli animazione">
+          <section className="player-card" aria-label={t("home.controls")}>
             <div className="player">
-              <button onClick={() => setIdx((n) => Math.max(n - 1, 0))} aria-label="Step precedente" disabled={i === 0}>
+              <button onClick={() => setIdx((n) => Math.max(n - 1, 0))} aria-label={t("home.previousStep")} disabled={i === 0}>
                 ‹
               </button>
               <button className="play" onClick={() => setPlaying((p) => !p)}>
-                {playing ? "Pausa" : "Riproduci"}
+                {playing ? t("home.pause") : t("home.play")}
               </button>
-              <button onClick={() => setIdx((n) => Math.min(n + 1, steps.length - 1))} aria-label="Step successivo" disabled={i >= steps.length - 1}>
+              <button onClick={() => setIdx((n) => Math.min(n + 1, steps.length - 1))} aria-label={t("home.nextStep")} disabled={i >= steps.length - 1}>
                 ›
               </button>
               <input
@@ -268,15 +292,15 @@ export default function Viewer() {
                   setPlaying(false);
                   setIdx(Number(e.target.value));
                 }}
-                aria-label="Ora di previsione"
+                aria-label={t("home.forecastTime")}
               />
-              <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Velocità animazione">
-                <option value={1200}>Lenta</option>
-                <option value={600}>Normale</option>
-                <option value={300}>Veloce</option>
+              <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label={t("home.animationSpeed")}>
+                <option value={1200}>{t("home.slow")}</option>
+                <option value={600}>{t("home.normal")}</option>
+                <option value={300}>{t("home.fast")}</option>
               </select>
             </div>
-            <p className="attr">Usa le frecce o la barra spaziatrice per controllare l’animazione.</p>
+            <p className="attr">{t("home.animationHelp")}</p>
           </section>
         </main>
       </div>

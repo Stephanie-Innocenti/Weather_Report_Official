@@ -8,17 +8,13 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { useLanguage } from "@/components/LanguageControl";
 
 type ThemeMode = "system" | "light" | "dark";
 type ThemeContextValue = { mode: ThemeMode; setMode: (mode: ThemeMode) => void };
 
 const STORAGE_KEY = "weather-report-theme";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-const modes: { value: ThemeMode; label: string }[] = [
-  { value: "system", label: "Sistema" },
-  { value: "light", label: "Chiaro" },
-  { value: "dark", label: "Scuro" },
-];
 const themeListeners = new Set<() => void>();
 let sessionMode: ThemeMode | null = null;
 
@@ -108,16 +104,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export default function ThemeControl() {
   const context = useContext(ThemeContext);
+  const { t } = useLanguage();
   const detailsRef = useRef<HTMLDetailsElement>(null);
   if (!context) throw new Error("ThemeControl deve essere usato dentro ThemeProvider");
 
-  const currentLabel = modes.find(({ value }) => value === context.mode)?.label ?? "Sistema";
+  const modes: { value: ThemeMode; label: string }[] = [
+    { value: "system", label: t("theme.system") },
+    { value: "light", label: t("theme.light") },
+    { value: "dark", label: t("theme.dark") },
+  ];
+  const currentLabel = modes.find(({ value }) => value === context.mode)?.label ?? t("theme.system");
+  const currentLabelTemplate = t("theme.current").replace("{mode}", currentLabel);
   return (
     <details className="theme-picker" ref={detailsRef}>
-      <summary className="theme-toggle" aria-label={`Tema attuale: ${currentLabel}. Scegli modalità tema`} title={`Tema: ${currentLabel}`}>
+      <summary className="theme-toggle" aria-label={currentLabelTemplate} title={t("theme.title").replace("{mode}", currentLabel)}>
         <ThemeIcon mode={context.mode} />
       </summary>
-      <div className="theme-menu" role="group" aria-label="Modalità tema">
+      <div className="theme-menu" role="group" aria-label={t("theme.aria")}>
         {modes.map(({ value, label }) => (
           <button
             key={value}
