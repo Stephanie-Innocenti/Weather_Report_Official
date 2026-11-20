@@ -12,10 +12,10 @@ on:
       force:
         description: "Rigenera anche se esiste"
         type: boolean
-        default: true
+        default: false
       vars:
-        description: "Variabili da rigenerare (predefinito: t850; vuoto = tutte)"
-        default: "t850"
+        description: "Variabili da rigenerare (vuoto = tutte; es. t850)"
+        default: ""
       steps_max:
         description: "Limita gli step per un test veloce, es. 12 (vuoto = tutti)"
         default: ""
