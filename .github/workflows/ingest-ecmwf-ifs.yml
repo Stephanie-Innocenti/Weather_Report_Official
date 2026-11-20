@@ -2,8 +2,8 @@ name: ingest-ecmwf-ifs
 
 on:
   schedule:
-    # Riprova due volte all'ora nelle finestre di disponibilita' dei run 00/12 UTC.
-    - cron: "20,40 7-14,19-23 * * *"
+    # Gli step fino a 144 sono distribuiti entro le 06:27/18:27 UTC; un job per run.
+    - cron: "0 7,19 * * *"
   workflow_dispatch:
     inputs:
       run:

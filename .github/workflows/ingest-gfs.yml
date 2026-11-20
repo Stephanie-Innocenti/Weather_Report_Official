@@ -2,8 +2,8 @@ name: ingest-gfs
 
 on:
   schedule:
-    # Avvia i controlli da +5 ore dal run, quando gli indici GFS sono piu' stabili.
-    - cron: "20,40 5-7,11-13,17-19,23,0,1 * * *"
+    # Attende +6 ore per gli indici completi; un solo job per ciascun run GFS.
+    - cron: "0 0,6,12,18 * * *"
   workflow_dispatch:
     inputs:
       run:
@@ -58,7 +58,7 @@ jobs:
           STEPS: ${{ inputs.steps_max && format('--steps-max {0}', inputs.steps_max) || '' }}
         run: |
           if [ "$RUN" = "latest" ] && [ -z "$FORCE" ] && [ -z "$VARS" ] && [ -z "$STEPS" ]; then
-            RUNS="$(python -c 'from wr_pipeline import config; from wr_pipeline.sources.noaa_gfs import available_runs; cfg=config.load("models")["gfs"]; print(" ".join(run.strftime("%Y%m%d%H") for run in available_runs(cfg["steps"]["stop"], 2)))')"
+            RUNS="$(python -c 'from wr_pipeline import config; from wr_pipeline.sources.noaa_gfs import available_runs; cfg=config.load("models")["gfs"]; print(" ".join(run.strftime("%Y%m%d%H") for run in available_runs(cfg["steps"]["stop"], 1)))')"
             for candidate in $RUNS; do
               wr ingest --model gfs --run "$candidate"
             done

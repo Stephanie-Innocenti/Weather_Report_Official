@@ -2,8 +2,8 @@ name: ingest-icon-eu
 
 on:
   schedule:
-    # ICON-EU: run 00/06/12/18 UTC, disponibili dopo circa 4 ore. Job idempotente.
-    - cron: "30 4-7,10-13,16-19,22,23,0,1 * * *"
+    # I run completi sono disponibili circa 4 ore dopo l'inizializzazione; un job per run.
+    - cron: "0 4,10,16,22 * * *"
   workflow_dispatch:
     inputs:
       run:
