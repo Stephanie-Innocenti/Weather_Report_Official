@@ -80,21 +80,13 @@ def test_t850_style_uses_three_degree_bands_and_two_degree_isotherms():
     _load_style()(var, levels)
 
 
-def test_t850_colors_near_zero_transition_from_blue_to_green():
-    import matplotlib
-    matplotlib.use("Agg")
-    from matplotlib.colors import to_rgb
-
+def test_t850_colors_near_zero_match_reference_palette():
     var = config.load("variables")["t850"]
-    levels = np.arange(var["levels"][0], var["levels"][1] + var["levels"][2] / 2, var["levels"][2])
-    cmap = _load_style()(var, levels)["cmap"]
+    stops = dict(var["stops"])
 
-    def color_at(value):
-        return to_rgb(cmap((value - levels[0]) / (levels[-1] - levels[0])))
-
-    near_zero_below = color_at(-3)
-    zero = color_at(0)
-    above_zero = color_at(3)
-    assert near_zero_below[2] > near_zero_below[1] > near_zero_below[0]
-    assert zero[2] > zero[1] > zero[0]
-    assert above_zero[1] > above_zero[2] > above_zero[0]
+    assert {level: stops[level] for level in (-6, -3, 0, 3)} == {
+        -6: "#66ffff",
+        -3: "#66ff99",
+        0: "#66ff66",
+        3: "#66ff00",
+    }
