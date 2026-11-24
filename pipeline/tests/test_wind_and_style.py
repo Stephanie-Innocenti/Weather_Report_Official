@@ -37,6 +37,18 @@ def _load_style():
     return ns["_style"]
 
 
+def _load_levels_and_style():
+    src = Path(__file__).resolve().parents[1] / "src/wr_pipeline/render/maps.py"
+    text = src.read_text(encoding="utf-8")
+    levels_body = text[text.index("def _levels("):text.index("def _style(")]
+    style_body = text[text.index("def _style("):text.index("def render_map(")]
+    ns = {}
+    exec("import numpy as np\nimport matplotlib.pyplot as plt\n"
+         "from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap\n"
+         + levels_body + style_body, ns)
+    return ns["_levels"], ns["_style"]
+
+
 def test_style_colors_map_one_to_one():
     import matplotlib
     matplotlib.use("Agg")
@@ -71,13 +83,19 @@ def test_style_wrong_color_count():
 
 def test_t850_style_uses_three_degree_bands_and_two_degree_isotherms():
     var = config.load("variables")["t850"]
-    levels = np.arange(var["levels"][0], var["levels"][1] + var["levels"][2] / 2, var["levels"][2])
+    levels_fn, style = _load_levels_and_style()
+    levels = levels_fn(var)
 
     assert var["levels"] == [-54, 54, 3]
     assert var["lines"] == [-54, 54, 2]
     assert len(var["stops"]) == 37
-    assert var["colorbar_tick_step"] == 1
-    _load_style()(var, levels)
+    assert var["colorbar_tick_levels"] == [-54, 54, 2]
+    assert len(levels) == len(var["stops"]) + 1
+    result = style(var, levels)
+    assert result["cmap"].colors == [color for _, color in var["stops"]]
+    assert np.array_equal(result["norm"].boundaries, levels)
+    centers = np.array([value for value, _ in var["stops"]])
+    assert np.array_equal(result["norm"](centers), np.arange(len(centers)))
 
 
 def test_t850_colors_near_zero_match_reference_palette():

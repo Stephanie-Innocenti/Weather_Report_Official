@@ -20,19 +20,33 @@ PC = ccrs.PlateCarree()
 def _levels(var: dict) -> np.ndarray:
     if "levels_list" in var:
         return np.array(var["levels_list"], dtype=float)
+    if var.get("discrete_stops"):
+        centers = np.array([float(value) for value, _ in var["stops"]])
+        spacing = np.diff(centers)
+        if len(centers) < 2 or np.any(spacing <= 0):
+            raise ValueError(f"{var['label']}: i livelli discreti devono essere crescenti")
+        boundaries = np.empty(len(centers) + 1)
+        boundaries[1:-1] = (centers[:-1] + centers[1:]) / 2
+        boundaries[0] = centers[0] - spacing[0] / 2
+        boundaries[-1] = centers[-1] + spacing[-1] / 2
+        return boundaries
     lo, hi, step = var["levels"]
     return np.arange(lo, hi + step / 2, step)
 
 
 def _style(var: dict, levels: np.ndarray) -> dict:
-    """Argomenti di colore per contourf. Tre modi, in ordine:
-    colors = un colore per fascia (+1 per ogni estremo aperto), stops = gradiente ancorato ai valori, cmap = nome matplotlib."""
+    """Argomenti di colore per contourf: colori per fascia, stop discreti o gradiente."""
     if "colors" in var:
         ext = var.get("extend", "neither")
         n = len(levels) - 1 + {"neither": 0, "min": 1, "max": 1, "both": 2}[ext]
         if len(var["colors"]) != n:
             raise ValueError(f"{var['label']}: servono {n} colori, ce ne sono {len(var['colors'])}")
         return {"cmap": ListedColormap(var["colors"]), "norm": BoundaryNorm(levels, ncolors=n, extend=ext)}
+    if var.get("discrete_stops"):
+        colors = [color for _, color in var["stops"]]
+        if len(levels) != len(colors) + 1:
+            raise ValueError(f"{var['label']}: livelli e colori discreti non corrispondono")
+        return {"cmap": ListedColormap(colors), "norm": BoundaryNorm(levels, ncolors=len(colors))}
     if "stops" in var:
         lo, hi = float(levels[0]), float(levels[-1])
         pts = [(min(max((float(v) - lo) / (hi - lo), 0.0), 1.0), c) for v, c in var["stops"]]
@@ -62,6 +76,8 @@ def render_map(field, var: dict, region: dict, meta: dict, vectors=None) -> byte
         cs = ax.contour(lon, lat, vals, levels=levels, colors="#222222", linewidths=0.8, transform=PC, zorder=1)
         ax.clabel(cs, fmt="%d", fontsize=7)
     else:
+        if var.get("discrete_stops"):
+            vals = np.clip(vals, var["stops"][0][0], var["stops"][-1][0])
         if "mask_below" in var:
             vals = np.ma.masked_less(vals, var["mask_below"])
         mappable = ax.contourf(
@@ -106,8 +122,12 @@ def render_map(field, var: dict, region: dict, meta: dict, vectors=None) -> byte
         cb = fig.colorbar(mappable, ax=ax, orientation="horizontal", pad=0.05, shrink=0.85, aspect=45)
         cb.set_label(f"{var['label']} ({var['unit']})", fontsize=8)
         cb.ax.tick_params(labelsize=7)
-        tick_step = var.get("colorbar_tick_step", max(1, len(levels) // 12))
-        cb.set_ticks(levels[::tick_step])
+        if "colorbar_tick_levels" in var:
+            lo, hi, step = var["colorbar_tick_levels"]
+            cb.set_ticks(np.arange(lo, hi + step / 2, step))
+        else:
+            tick_step = var.get("colorbar_tick_step", max(1, len(levels) // 12))
+            cb.set_ticks(levels[::tick_step])
 
     title = f"{meta['model_label']}  |  {var['label']} ({var['unit']})"
     sub = f"Run {meta['run']:%d/%m/%Y %H} UTC   +{meta['step']:03d}h   valido {meta['valid']:%a %d/%m/%Y %H} UTC"
