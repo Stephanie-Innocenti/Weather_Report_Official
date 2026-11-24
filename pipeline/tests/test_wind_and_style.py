@@ -99,12 +99,19 @@ def test_t850_style_uses_three_degree_bands_and_two_degree_isotherms():
 
 
 def test_t850_colors_near_zero_match_reference_palette():
+    from matplotlib.colors import to_hex
+
     var = config.load("variables")["t850"]
     stops = dict(var["stops"])
 
-    assert {level: stops[level] for level in (-6, -3, 0, 3)} == {
+    assert {level: stops[level] for level in (-6, -3, 0, 3, 6)} == {
         -6: "#66ffff",
         -3: "#66ff99",
-        0: "#66ff66",
-        3: "#66ff00",
+        0: "#66ff99",
+        3: "#66ff66",
+        6: "#66ff00",
     }
+    levels_fn, style = _load_levels_and_style()
+    rendered = style(var, levels_fn(var))
+    assert to_hex(rendered["cmap"](rendered["norm"](0))) == "#66ff99"
+    assert to_hex(rendered["cmap"](rendered["norm"](3))) == "#66ff66"
