@@ -31,17 +31,30 @@ def _url(run: dt.datetime, step: int, spec: dict) -> str:
     return f"{BASE}/{hh}/{var.lower()}/{name}"
 
 
-def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
-    """Ultimo run il cui ultimo step e' gia' pubblicato (se un run non arriva a max_step viene saltato)."""
+def available_runs(max_step: int, spec: dict, limit: int = 1) -> list[dt.datetime]:
+    """Run completi piu' recenti, dal piu' vecchio al piu' nuovo."""
+    if limit < 1:
+        raise ValueError("limit deve essere almeno 1")
     now = dt.datetime.now(dt.timezone.utc).replace(minute=0, second=0, microsecond=0, tzinfo=None)
     cand = now.replace(hour=now.hour - now.hour % 6)
+    runs = []
     for _ in range(6):
         r = _session.head(_url(cand, max_step, spec), timeout=30)
         if r.status_code == 200:
-            log.info("Ultimo run utilizzabile: %s", cand)
-            return cand
+            runs.append(cand)
+            if len(runs) == limit:
+                break
         cand -= dt.timedelta(hours=6)
-    raise RuntimeError("Nessun run ICON-EU completo trovato (il DWD conserva solo circa un giorno di dati)")
+    if not runs:
+        raise RuntimeError("Nessun run ICON-EU completo trovato (il DWD conserva solo circa un giorno di dati)")
+    runs.reverse()
+    log.info("Run ICON-EU completi: %s", ", ".join(run.strftime("%Y%m%d%H") for run in runs))
+    return runs
+
+
+def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
+    """Ultimo run il cui ultimo step e' gia' pubblicato."""
+    return available_runs(max_step, spec, 1)[-1]
 
 
 def download(cfg: dict, run: dt.datetime, spec: dict, steps: list[int], target: Path) -> Path:

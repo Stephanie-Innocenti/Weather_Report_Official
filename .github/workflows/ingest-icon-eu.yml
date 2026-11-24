@@ -56,4 +56,12 @@ jobs:
           FORCE: ${{ inputs.force && '--force' || '' }}
           VARS: ${{ inputs.vars && format('--vars {0}', inputs.vars) || '' }}
           STEPS: ${{ inputs.steps_max && format('--steps-max {0}', inputs.steps_max) || '' }}
-        run: wr ingest --model icon-eu --run "$RUN" $FORCE $VARS $STEPS
+        run: |
+          if [ "$RUN" = "latest" ] && [ -z "$FORCE" ] && [ -z "$VARS" ] && [ -z "$STEPS" ]; then
+            RUNS="$(python -c 'import json; from wr_pipeline import config, naming; from wr_pipeline.publish.storage import get_store; from wr_pipeline.sources.dwd_icon import available_runs; cfg=config.load("models")["icon-eu"]; raw=get_store(None).get(naming.LATEST_KEY); latest=json.loads(raw).get("models", {}).get("icon-eu", {}).get("run", "") if raw else ""; print(" ".join(naming.run_id(run) for run in available_runs(cfg["steps"]["stop"], cfg["params"]["t2m"], 4) if naming.run_id(run) > latest))')"
+            for candidate in $RUNS; do
+              wr ingest --model icon-eu --run "$candidate"
+            done
+          else
+            wr ingest --model icon-eu --run "$RUN" $FORCE $VARS $STEPS
+          fi

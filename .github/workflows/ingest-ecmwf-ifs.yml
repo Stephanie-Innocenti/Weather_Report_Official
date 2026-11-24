@@ -2,7 +2,7 @@ name: ingest-ecmwf-ifs
 
 on:
   schedule:
-    # Gli step fino a 144 sono distribuiti entro le 06:27/18:27 UTC; un job per run.
+    # Il run 00 arriva completo circa alle 06:27 UTC; il run 12 circa alle 18:27 UTC.
     - cron: "0 7,19 * * *"
   workflow_dispatch:
     inputs:
@@ -56,4 +56,22 @@ jobs:
           FORCE: ${{ inputs.force && '--force' || '' }}
           VARS: ${{ inputs.vars && format('--vars {0}', inputs.vars) || '' }}
           STEPS: ${{ inputs.steps_max && format('--steps-max {0}', inputs.steps_max) || '' }}
-        run: wr ingest --model ecmwf-ifs --run "$RUN" $FORCE $VARS $STEPS
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            RUNS="$(python -c 'import json; from wr_pipeline import config, naming; from wr_pipeline.publish.storage import get_store; from wr_pipeline.sources.ecmwf import available_runs; cfg=config.load("models")["ecmwf-ifs"]; spec=config.param_spec(cfg["params"]["t2m"]); raw=get_store(None).get(naming.LATEST_KEY); latest=json.loads(raw).get("models", {}).get("ecmwf-ifs", {}).get("run", "") if raw else ""; print(" ".join(naming.run_id(run) for run in available_runs(cfg, cfg["steps"]["stop"], spec, 4) if naming.run_id(run) > latest))')"
+            for candidate in $RUNS; do
+              wr ingest --model ecmwf-ifs --run "$candidate"
+            done
+          else
+            for attempt in 1 2 3 4; do
+              if wr ingest --model ecmwf-ifs --run "$RUN" $FORCE $VARS $STEPS; then
+                exit 0
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                echo "Run ECMWF non ancora pronto; nuovo tentativo tra 10 minuti ($attempt/4)"
+                sleep 600
+              fi
+            done
+            exit 1
+          fi

@@ -2,8 +2,8 @@ name: ingest-gfs
 
 on:
   schedule:
-    # Attende +6 ore per gli indici completi; un solo job per ciascun run GFS.
-    - cron: "0 0,6,12,18 * * *"
+    # Avvia dopo la pubblicazione prevista dei run GFS (00/06/12/18 UTC).
+    - cron: "0 4,10,16,22 * * *"
   workflow_dispatch:
     inputs:
       run:
@@ -58,7 +58,7 @@ jobs:
           STEPS: ${{ inputs.steps_max && format('--steps-max {0}', inputs.steps_max) || '' }}
         run: |
           if [ "$RUN" = "latest" ] && [ -z "$FORCE" ] && [ -z "$VARS" ] && [ -z "$STEPS" ]; then
-            RUNS="$(python -c 'from wr_pipeline import config; from wr_pipeline.sources.noaa_gfs import available_runs; cfg=config.load("models")["gfs"]; print(" ".join(run.strftime("%Y%m%d%H") for run in available_runs(cfg["steps"]["stop"], 1)))')"
+            RUNS="$(python -c 'import json; from wr_pipeline import config, naming; from wr_pipeline.publish.storage import get_store; from wr_pipeline.sources.noaa_gfs import available_runs; cfg=config.load("models")["gfs"]; raw=get_store(None).get(naming.LATEST_KEY); latest=json.loads(raw).get("models", {}).get("gfs", {}).get("run", "") if raw else ""; print(" ".join(naming.run_id(run) for run in available_runs(cfg["steps"]["stop"], 4) if naming.run_id(run) > latest))')"
             for candidate in $RUNS; do
               wr ingest --model gfs --run "$candidate"
             done

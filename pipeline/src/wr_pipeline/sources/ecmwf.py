@@ -28,22 +28,31 @@ def _clients(cfg: dict):
             log.warning("Sorgente %s non disponibile: %s", name, e)
 
 
-def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
-    available: list[tuple[dt.datetime, str]] = []
-    for name, client in _clients(cfg):
-        try:
-            run = client.latest(type="fc", stream=cfg["stream"], step=max_step, **_req(spec))
-        except Exception as e:
-            log.warning("latest() fallito con %s: %s", name, e)
-            continue
-        hour = max(h for h in cfg["runs"] if h <= run.hour)
-        run = run.replace(hour=hour, minute=0, second=0, microsecond=0)
-        available.append((run, name))
-    if not available:
+def available_runs(cfg: dict, max_step: int, spec: dict, limit: int = 4) -> list[dt.datetime]:
+    """Ultimi run completi per ciascun ciclo configurato, dal piu' vecchio al piu' nuovo."""
+    if limit < 1:
+        raise ValueError("limit deve essere almeno 1")
+    clients = list(_clients(cfg))
+    runs: set[dt.datetime] = set()
+    for hour in cfg["runs"]:
+        for name, client in clients:
+            try:
+                run = client.latest(
+                    type="fc", stream=cfg["stream"], time=hour, step=max_step, **_req(spec)
+                )
+            except Exception as e:
+                log.warning("latest() per il ciclo %02d fallito con %s: %s", hour, name, e)
+                continue
+            runs.add(run.replace(hour=hour, minute=0, second=0, microsecond=0))
+    if not runs:
         raise RuntimeError("Nessuna sorgente ha risposto per il calcolo dell'ultimo run")
-    run, name = max(available, key=lambda item: item[0])
-    log.info("Ultimo run utilizzabile: %s (sorgente %s)", run, name)
-    return run
+    result = sorted(runs)[-limit:]
+    log.info("Run ECMWF completi: %s", ", ".join(run.strftime("%Y%m%d%H") for run in result))
+    return result
+
+
+def latest_run(cfg: dict, max_step: int, spec: dict) -> dt.datetime:
+    return available_runs(cfg, max_step, spec, 1)[-1]
 
 
 def download(cfg: dict, run: dt.datetime, spec: dict, steps: list[int], target: Path) -> Path:

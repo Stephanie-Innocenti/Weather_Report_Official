@@ -9,7 +9,7 @@ import pandas as pd
 from wr_pipeline import cli, config, naming
 from wr_pipeline.publish import manifest as mf
 from wr_pipeline.publish.storage import LocalStore
-from wr_pipeline.sources import noaa_gfs
+from wr_pipeline.sources import dwd_icon, noaa_gfs
 
 
 class FakeField:
@@ -96,6 +96,31 @@ def test_available_gfs_runs_are_returned_oldest_first(monkeypatch):
     assert runs == [
         real_datetime(2026, 11, 11, 0),
         real_datetime(2026, 11, 11, 6),
+    ]
+
+
+def test_available_icon_runs_are_returned_oldest_first(monkeypatch):
+    real_datetime = dt.datetime
+
+    class FixedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 11, 16, 30, tzinfo=tz)
+
+    statuses = iter([200, 200, 200])
+    monkeypatch.setattr(dwd_icon.dt, "datetime", FixedDateTime)
+    monkeypatch.setattr(
+        dwd_icon._session,
+        "head",
+        lambda url, timeout: types.SimpleNamespace(status_code=next(statuses)),
+    )
+
+    runs = dwd_icon.available_runs(120, {"param": "T_2M"}, limit=3)
+
+    assert runs == [
+        real_datetime(2026, 11, 11, 0),
+        real_datetime(2026, 11, 11, 6),
+        real_datetime(2026, 11, 11, 12),
     ]
 
 

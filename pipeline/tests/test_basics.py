@@ -56,12 +56,18 @@ def test_gfs_ranges(monkeypatch):
     assert g._ranges("u", {"param": "TMP", "level": "2 m above ground"}) == []
 
 
-def test_ecmwf_latest_run_uses_newest_source(monkeypatch):
+def test_ecmwf_available_runs_uses_newest_source_per_cycle(monkeypatch):
     from wr_pipeline.sources import ecmwf
 
     runs = {
-        "google": dt.datetime(2026, 11, 15, 12),
-        "aws": dt.datetime(2026, 11, 16, 6),
+        "google": {
+            0: dt.datetime(2026, 11, 15, 0),
+            12: dt.datetime(2026, 11, 15, 12),
+        },
+        "aws": {
+            0: dt.datetime(2026, 11, 16, 0),
+            12: dt.datetime(2026, 11, 16, 12),
+        },
     }
 
     class FakeClient:
@@ -69,14 +75,19 @@ def test_ecmwf_latest_run_uses_newest_source(monkeypatch):
             self.source = source
 
         def latest(self, **kwargs):
-            return runs[self.source]
+            return runs[self.source][kwargs["time"]]
 
     monkeypatch.setattr(
         ecmwf, "_clients", lambda cfg: [(name, FakeClient(name)) for name in ("google", "aws")]
     )
     cfg = {"runs": [0, 12], "stream": "oper"}
 
-    assert ecmwf.latest_run(cfg, 144, {"param": "2t"}) == dt.datetime(2026, 11, 16, 0)
+    assert ecmwf.available_runs(cfg, 144, {"param": "2t"}, limit=3) == [
+        dt.datetime(2026, 11, 15, 12),
+        dt.datetime(2026, 11, 16, 0),
+        dt.datetime(2026, 11, 16, 12),
+    ]
+    assert ecmwf.latest_run(cfg, 144, {"param": "2t"}) == dt.datetime(2026, 11, 16, 12)
 
 
 def test_open_param_reports_missing_grib_field(monkeypatch, tmp_path):

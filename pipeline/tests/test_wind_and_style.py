@@ -78,3 +78,23 @@ def test_t850_style_uses_three_degree_bands_and_two_degree_isotherms():
     assert len(var["stops"]) == 37
     assert var["colorbar_tick_step"] == 1
     _load_style()(var, levels)
+
+
+def test_t850_colors_near_zero_transition_from_blue_to_green():
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.colors import to_rgb
+
+    var = config.load("variables")["t850"]
+    levels = np.arange(var["levels"][0], var["levels"][1] + var["levels"][2] / 2, var["levels"][2])
+    cmap = _load_style()(var, levels)["cmap"]
+
+    def color_at(value):
+        return to_rgb(cmap((value - levels[0]) / (levels[-1] - levels[0])))
+
+    near_zero_below = color_at(-3)
+    zero = color_at(0)
+    above_zero = color_at(3)
+    assert near_zero_below[2] > near_zero_below[1] > near_zero_below[0]
+    assert zero[2] > zero[1] > zero[0]
+    assert above_zero[1] > above_zero[2] > above_zero[0]
