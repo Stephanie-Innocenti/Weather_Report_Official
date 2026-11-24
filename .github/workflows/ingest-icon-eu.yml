@@ -16,7 +16,7 @@ on:
       vars:
         description: "Variabili da rigenerare (vuoto = tutte; es. t850)"
         default: ""
-    steps_max:
+      steps_max:
         description: "Limita gli step per un test veloce, es. 12 (vuoto = tutti)"
         default: ""
 
